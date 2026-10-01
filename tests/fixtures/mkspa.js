@@ -1,0 +1,10 @@
+const {PDFDocument,StandardFonts}=require('pdf-lib'); const fs=require('fs'); const {execSync}=require('child_process');
+(async()=>{ const d=await PDFDocument.create(); const f=await d.embedFont(StandardFonts.TimesRoman);
+ const lines=['Distrito Escolar Northfield','Autorizaci\u00f3n para la excursi\u00f3n','Nombre: Mar\u00eda Gonz\u00e1lez Pe\u00f1a','Firme aqu\u00ed antes del mi\u00e9rcoles.'];
+ const p=d.addPage([612,792]); lines.forEach((l,i)=>p.drawText(l,{x:72,y:700-i*40,size:i<2?22:16,font:f}));
+ fs.writeFileSync('/tmp/spa-src.pdf', await d.save());
+ execSync('pdftoppm -r 150 -gray -png /tmp/spa-src.pdf /tmp/spascan');
+ const s=await PDFDocument.create(); const img=await s.embedPng(fs.readFileSync('/tmp/spascan-1.png'));
+ const pg=s.addPage([612,792]); pg.drawImage(img,{x:0,y:0,width:612,height:792});
+ fs.writeFileSync('fx/scan-spa.pdf', await s.save()); console.log('ok, text layer:', JSON.stringify(execSync('pdftotext fx/scan-spa.pdf -').toString().trim()));
+})();

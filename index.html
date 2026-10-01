@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-hjKPjsol93W/x4e9kXOuxIReDOTrQ1LYJp5gUNZLjP4=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-HtsgXZb24RQJUhtQKbPoXioCdmQOIMtVTPj5w7nLHYk=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>PDF Tools</title>
+<title>PDF Tool Kit</title>
 <style>
   :root {
     --black: #0a0a0a;
@@ -441,12 +441,11 @@
   <div class="top-inner">
     
     <div class="top-text">
-      <h1>PDF Tools</h1>
-      <p>Private, offline PDF tools</p>
+      <h1>PDF Tool Kit</h1>
     </div>
     <div class="top-lock" title="Files are processed on this device and never uploaded">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-      <span>Files stay on this device</span>
+      <span>Everything runs in your browser</span>
     </div>
   </div>
 </header>
@@ -2238,7 +2237,7 @@ else if (typeof exports === 'object')
     $("sig-current").hidden = !sg.sig;
     $("sig-tool").classList.toggle("has-sig", !!sg.sig);
   }
-  const SIG_KEY = "acsd3-pdf-tools:signature";
+  const SIG_KEY = "pdf-tool-kit:signature";
   const SIG_STYLES = [
     { family: "Sig Vibes", label: "Elegant" },
     { family: "Sig Dancing", label: "Flowing" },
@@ -3985,8 +3984,10 @@ else if (typeof exports === 'object')
       // If the two disagree badly, our reading of the stream is wrong for this run; keep it
       // out of reach rather than redraw it at the wrong size.
       const trustworthy = !op || !parsed || (shown && Math.abs(parsed - shown) <= Math.max(0.6, shown * 0.2));
+      // "sawForm" is true for any XObject, images included, so only blame a reusable block
+      // when one with text in it was actually parsed.
       const reason = op ? (trustworthy ? null : "size")
-        : (ops.sawForm ? "form" : "unpositioned");
+        : (ops.streams && ops.streams.size ? "form" : "unpositioned");
       runs.push({
         str: it.str, x: e, y: f, w: it.width, h: it.height || shown,
         editable: !!op && trustworthy,
@@ -5287,7 +5288,7 @@ else if (typeof exports === 'object')
     try { M = await TesseractCore({ wasmBinary: b64ToBytes(assets.wasm), print: () => {}, printErr: () => {} }); }
     catch (e) {
       const m = String(e && e.message || e);
-      if (/WebAssembly|wasm|unsafe-eval|CompileError/i.test(m)) throw new Error("OCR needs WebAssembly, which this viewer's security settings block. Use the downloadable version of the tool (acsd3-pdf-tools-local.html) for OCR.");
+      if (/WebAssembly|wasm|unsafe-eval|CompileError/i.test(m)) throw new Error("OCR needs WebAssembly, which this viewer's security settings block. Use the downloadable copy of this page for OCR.");
       throw e;
     }
     models.forEach(([c, data]) => M.FS.writeFile("./" + c + ".traineddata", data));

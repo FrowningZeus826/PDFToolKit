@@ -1,0 +1,16 @@
+{
+  "name": "pdf-tool-kit-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browser test suites (headless Chromium + external PDF validators)",
+  "scripts": {
+    "fixtures": "bash fixtures/make-fixtures.sh",
+    "test": "node suite.js && node edits.js && node adv.js && node offline.js"
+  },
+  "dependencies": {
+    "@sparticuz/chromium": "131.0.1",
+    "puppeteer-core": "23.11.1",
+    "pngjs": "7.0.0",
+    "pdf-lib": "1.17.1"
+  }
+}

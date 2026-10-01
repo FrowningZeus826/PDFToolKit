@@ -1,0 +1,468 @@
+<header class="top">
+  <div class="top-inner">
+    <img src="data:image/png;base64,__LOGO_B64__" alt="__LOGO_ALT__">
+    <div class="top-text">
+      <h1>__TITLE__</h1>
+      <p>__ORG__</p>
+    </div>
+    <div class="top-lock" title="Files are processed on this device and never uploaded">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      <span>__BADGE__</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="rail" aria-label="Tools">
+    <div class="rail-inner">
+      <button class="rail-btn active" data-tool="document">
+        <svg viewBox="0 0 24 24"><path d="M6 3h8l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M14 3v5h5"/><path d="M9 13l2 2 4-4"/></svg>
+        <span>Document</span>
+      </button>
+      <button class="rail-btn" data-tool="pages">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="7" height="9" rx="1"/><rect x="14" y="4" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="4" rx="1"/><rect x="14" y="16" width="7" height="4" rx="1"/></svg>
+        <span>Pages</span>
+      </button>
+      <div class="rail-sep"></div>
+      <button class="rail-btn" data-tool="prepare">
+        <svg viewBox="0 0 24 24"><path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3"/><path d="M8 9h8M8 12h8M8 15h5"/></svg>
+        <span>Prepare</span>
+      </button>
+      <button class="rail-btn" data-tool="finish">
+        <svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 20h16"/></svg>
+        <span>Finish</span>
+      </button>
+      <div class="rail-sep"></div>
+      <button class="rail-btn clear" id="clear-all" title="Close every file in every tool">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 10v7M14 10v7"/></svg>
+        <span>Clear</span>
+      </button>
+      <div class="rail-file" id="rail-file">No file open</div>
+    </div>
+  </nav>
+
+  <main class="work">
+    <div class="docbar" id="docbar" hidden>
+      <div class="docbar-main">
+        <div class="docbar-text">
+          <b id="docbar-name"></b>
+          <span id="docbar-steps"></span>
+          <span class="rail-signed" id="docbar-sig" hidden>Digitally signed &mdash; any change here produces a copy without a valid signature.</span>
+        </div>
+        <div class="docbar-actions">
+          <button class="btn" id="docbar-undo" hidden>Undo</button>
+          <button class="btn strong" id="docbar-dl" disabled>Download</button>
+        </div>
+      </div>
+      <div class="status" id="docbar-status" role="status"></div>
+    </div>
+
+
+    <!-- VIEW -->
+    <section class="panel active" id="panel-document">
+      <div class="panel-body docbody">
+        <div class="vempty" id="doc-empty">
+          <h2>Open a PDF</h2>
+          <p class="sub">View it here, then use the tools to edit, sign, organize, protect, or optimize it. The file you open is ready in every tool.</p>
+          <label class="dropzone" id="edit-dz" tabindex="0" role="button" aria-label="Open a PDF to view">
+            <span class="dz-title">Choose a PDF, or drag it here</span>
+            <span class="dz-sub">Nothing is uploaded</span>
+            <input type="file" id="edit-input" accept="application/pdf,.pdf">
+          </label>
+          <div class="status" id="doc-status" role="status"></div>
+          <div class="sigrow" id="empty-saved-sig" hidden>
+            <span class="sigimg"><img id="empty-saved-img" alt="Saved signature"></span>
+            <span class="grow">A signature is saved in this browser.</span>
+            <button class="btn" id="empty-sig-forget">Forget it</button>
+          </div>
+          <div class="trust"><strong>Nothing leaves this device.</strong> Every file is opened and processed inside your browser. No uploads, no server, no tracking. Closing this tab clears everything.</div>
+        </div>
+        <div id="edit-work" hidden>
+          <div class="seg" id="edit-modes" role="tablist" aria-label="Edit mode" style="margin-top:6px;">
+            <button class="segbtn active" role="tab" aria-selected="true" data-emode="annotate">Add to page</button>
+            <button class="segbtn" role="tab" aria-selected="false" data-emode="form">Fill form <span id="edit-fieldcount"></span></button>
+            <button class="segbtn" role="tab" aria-selected="false" data-emode="text">Edit text</button>
+            <button class="segbtn" role="tab" aria-selected="false" data-emode="redact">Redact</button>
+            <button class="segbtn" role="tab" aria-selected="false" data-emode="doc">Whole document</button>
+          </div>
+          <div id="edit-textpanel" hidden>
+            <div class="props">
+              <div class="hint" id="tx-empty">Tap a highlighted paragraph to edit it, or drag it to move it. Each line keeps its place, so tables and addresses hold their shape; add or remove lines and the block reflows. Text drawn inside reusable blocks, and scanned pages, can't be edited here.</div>
+              <div id="tx-edit" hidden>
+                <div class="prophead"><b>Paragraph</b><span class="muted" id="tx-lines"></span><button class="btn" id="tx-revert" hidden>Undo change</button></div>
+                <div class="pagesbar">
+                  <button class="btn" id="tx-merge" title="Join this block with another one you pick">Merge with…</button>
+                  <button class="btn" id="tx-split" title="Split this block where you click on the page">Split…</button>
+                </div>
+                <textarea id="tx-text" rows="5" spellcheck="false"></textarea>
+                <div class="row2">
+                  <div><label class="field-label" for="tx-font">Font</label><select id="tx-font"></select></div>
+                  <div><label class="field-label" for="tx-size">Size</label><input type="number" id="tx-size" min="4" max="96" step="0.5"></div>
+                </div>
+                <div class="warnline" id="tx-shared" hidden></div>
+                <div class="hint" id="tx-fontnote" hidden></div>
+                <div class="hint">Original: <span id="tx-original" class="muted"></span></div>
+                <div class="warnline" id="tx-warn" hidden>This is wider than the original line, so it may overlap what sits to its right.</div>
+              </div>
+            </div>
+          </div>
+          <div id="edit-redactpanel" hidden>
+            <div class="props">
+              <div class="prophead"><b>Redact</b><button class="btn" id="rd-clear">Clear all</button></div>
+              <div class="hint">Drag a box over anything that must be removed &mdash; names, ID numbers, addresses. The text underneath is <b>deleted from the file</b>, not covered over, so it can't be copied back out.</div>
+              <label class="field-label" for="rd-mark">When applied, the area should be</label>
+              <select id="rd-mark">
+                <option value="black">Blacked out (the usual redaction mark)</option>
+                <option value="white">Left blank</option>
+                <option value="none">Left as it is, with only the text removed</option>
+              </select>
+              <div class="hint" id="rd-count"></div>
+              <div class="hint muted" id="rd-total"></div>
+              <div class="warnline">Check the result before sharing. Anything drawn as part of a picture, and any scanned page, must be handled by flattening or blacking out the image itself &mdash; this removes text.</div>
+            </div>
+          </div>
+          <div id="edit-docopts" hidden>
+            <div class="checkline"><input type="checkbox" id="wm-on"><label for="wm-on"><b>Watermark</b></label></div>
+            <div class="row2">
+              <div><label class="field-label" for="wm-text">Text</label><input type="text" id="wm-text" maxlength="60" placeholder="e.g. CONFIDENTIAL"></div>
+              <div><label class="field-label" for="wm-style">Placement</label>
+                <select id="wm-style"><option value="diagonal" selected>Diagonal across the page</option><option value="top">Across the top</option><option value="bottom">Across the bottom</option></select></div>
+            </div>
+            <div class="row2">
+              <div><label class="field-label" for="wm-color">Color</label>
+                <select id="wm-color"><option value="#808080" selected>Gray</option><option value="#B3261E">Red</option><option value="#1E3A8A">Blue</option><option value="#000000">Black</option></select></div>
+              <div><label class="field-label" for="wm-opacity">Strength</label>
+                <div class="size-row"><input type="range" id="wm-opacity" min="10" max="80" step="5" value="25"><span id="wm-opv">25%</span></div></div>
+            </div>
+            <div class="checkline" style="margin-top:14px;"><input type="checkbox" id="pn-on"><label for="pn-on"><b>Page numbers</b></label></div>
+            <div class="row2">
+              <div><label class="field-label" for="pn-format">Format</label>
+                <select id="pn-format"><option value="n">1</option><option value="page">Page 1</option><option value="pageof" selected>Page 1 of 10</option><option value="dash">&ndash; 1 &ndash;</option></select></div>
+              <div><label class="field-label" for="pn-pos">Position</label>
+                <select id="pn-pos"><option value="bottom-center" selected>Bottom centre</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-center">Top centre</option></select></div>
+            </div>
+            <div class="row2">
+              <div><label class="field-label" for="pn-start">Start at</label><input type="number" id="pn-start" min="1" max="9999" value="1"></div>
+              <div><div class="checkline" style="margin-top:26px;"><input type="checkbox" id="pn-skip1"><label for="pn-skip1">Skip the first page (cover)</label></div></div>
+            </div>
+            <div class="hint">Applies to every page. Flip through the pages above to check the placement.</div>
+          </div>
+          <div class="workarea" id="workarea">
+          <div class="toolstrip">
+          <div class="toolrow" id="annot-tools" role="toolbar" aria-label="Add to page">
+            <button class="tool" data-tool="text" title="Text" aria-label="Text"><svg viewBox="0 0 24 24"><path d="M5 5h14M12 5v14M9 19h6"/></svg><span class="tlabel">Text</span></button>
+            <button class="tool" data-tool="date" title="Date" aria-label="Date"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="tlabel">Date</span></button>
+            <button class="tool" data-tool="check" title="Check" aria-label="Check"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg><span class="tlabel">Check</span></button>
+            <button class="tool" data-tool="cross" title="X" aria-label="X"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg><span class="tlabel">X</span></button>
+            <button class="tool" data-tool="hl" title="Highlight" aria-label="Highlight"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M7 16l2-7 6 0 2 7z"/></svg><span class="tlabel">Highlight</span></button>
+            <button class="tool" data-tool="box" title="Box" aria-label="Box"><svg viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="12" rx="1"/></svg><span class="tlabel">Box</span></button>
+            <button class="tool" data-tool="white" title="Whiteout" aria-label="Whiteout"><svg viewBox="0 0 24 24"><rect x="4" y="8" width="16" height="8" rx="1" stroke-dasharray="3 2"/></svg><span class="tlabel">Whiteout</span></button>
+            <button class="tool" id="sig-tool" data-tool="signature" title="Signature" aria-label="Signature"><svg viewBox="0 0 24 24"><path d="M3 18c3-1 5-4 7-8s4-6 6-6 2 2 0 4-6 5-6 8 3 2 5 0"/><path d="M14 20h7"/></svg><span class="tlabel">Signature</span></button>
+            <label class="tool" id="tool-image" tabindex="0" role="button" title="Image" aria-label="Image"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg><span class="tlabel">Image</span><input type="file" id="edit-img-input" class="vh" accept="image/png,image/jpeg"></label>
+          </div>
+
+          </div>
+          <div class="stagecol">
+            <div class="viewer-bar">
+              <div class="grp nav">
+                <button class="btn icon" id="e-prev" aria-label="Previous page" title="Previous page">&lsaquo;</button>
+                <span class="pg" id="e-label">Page 1 of 1</span>
+                <button class="btn icon" id="e-next" aria-label="Next page" title="Next page">&rsaquo;</button>
+              </div>
+              <div class="grp zoom">
+                <button class="btn icon" id="e-zout" aria-label="Zoom out" title="Zoom out">&minus;</button>
+                <span class="zoomval" id="e-zoom">Fit</span>
+                <button class="btn icon" id="e-zin" aria-label="Zoom in" title="Zoom in">+</button>
+                <button class="btn" id="e-fit" title="Switch between fitting the whole page and filling the width">Width</button>
+              </div>
+              <div class="grp file">
+                <span class="dfname" id="edit-name"></span>
+                <label class="btn" id="edit-open" tabindex="0" role="button" title="Open another PDF">Open<input type="file" id="edit-input2" class="vh" accept="application/pdf,.pdf"></label>
+              </div>
+            </div>
+            <div class="stage-wrap">
+              <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div></div>
+            </div>
+          </div>
+          <div class="ctlcol">
+          <div id="sigbox" hidden>        <div class="sigbox">
+          <div class="sighead">Your signature</div>
+
+          <div class="sigrow" id="sig-saved" hidden>
+            <span class="sigimg"><img id="sig-saved-img" alt="Saved signature"></span>
+            <span class="grow">Saved on this device</span>
+            <button class="btn" id="sig-use-saved">Use</button>
+            <button class="btn" id="sig-forget">Forget</button>
+          </div>
+
+          <div class="seg" role="tablist" aria-label="Signature source">
+            <button class="segbtn active" role="tab" aria-selected="true" data-mode="type">Type it</button>
+            <button class="segbtn" role="tab" aria-selected="false" data-mode="upload">Upload image</button>
+          </div>
+
+          <div id="sig-type-pane">
+            <input type="text" id="sig-name" placeholder="Type your name" maxlength="60" autocomplete="name" aria-label="Name for signature">
+            <div class="styles" id="sig-styles" role="radiogroup" aria-label="Signature style"></div>
+            <div class="inkrow" role="radiogroup" aria-label="Ink color">
+              <span class="muted">Ink</span>
+              <button class="ink active" data-ink="#141414" aria-label="Black ink"><i style="background:#141414"></i>Black</button>
+              <button class="ink" data-ink="#1B3A8C" aria-label="Blue ink"><i style="background:#1B3A8C"></i>Blue</button>
+            </div>
+            <button class="btn strong" id="sig-make" disabled>Use this signature</button>
+          </div>
+
+          <div id="sig-upload-pane" hidden>
+            <label class="dropzone compact" id="stamp-sig-dz" tabindex="0" role="button" aria-label="Choose a signature image">
+              <span class="dz-title">Choose an image</span>
+              <span class="dz-sub">PNG with a transparent background works best</span>
+              <input type="file" id="stamp-sig-input" accept="image/png,image/jpeg">
+            </label>
+          </div>
+
+          <div class="sigrow current" id="sig-current" hidden>
+            <span class="sigimg"><img id="sig-current-img" alt="Signature in use"></span>
+            <span class="grow"><b>In use</b><br><span class="muted">Tap the page to place it</span></span>
+            <button class="btn" id="sig-download">Download PNG</button>
+            <button class="btn" id="sig-remember">Save on this device</button>
+          </div>
+        </div>
+          </div>
+          <div class="hint" id="edit-hint" style="margin-bottom:10px;"></div>
+          <div class="props" id="eprops" hidden></div>
+          <div class="props" id="fpanel" hidden>
+            <div class="prophead"><b id="f-label"></b><span class="muted" id="f-pos"></span></div>
+            <div id="f-input"></div>
+            <div class="fnav">
+              <button class="btn" id="f-prev">&lsaquo; Previous field</button>
+              <button class="btn strong" id="f-next">Next field &rsaquo;</button>
+            </div>
+          </div>
+          <div class="checkline" id="flatten-line" hidden>
+            <input type="checkbox" id="f-flatten">
+            <label for="f-flatten">Lock the answers (flatten the form) so they can't be changed later</label>
+          </div>
+          <div class="count" id="edit-summary"></div>
+          </div></div>
+        </div>
+        <button class="primary" id="edit-go" disabled>Apply changes</button>
+        <div class="status" id="edit-status" role="status"></div>
+      </div>
+    </section>
+
+    <!-- MERGE -->
+    <section class="panel" id="panel-pages">
+      <div class="panel-body wide2">
+        <h2>Pages</h2>
+        <p class="sub">Reorder, rotate, delete, combine and extract pages. Drag to reorder; tap a page to select it.</p>
+        <label class="dropzone compact" id="pages-dz" tabindex="0" role="button" aria-label="Choose a PDF">
+          <span class="dz-title">Document</span>
+          <span class="dz-sub" id="pages-name">Choose a file or drag it here</span>
+          <input type="file" id="pages-input" accept="application/pdf,.pdf">
+        </label>
+        <div id="pages-work" hidden>
+          <div class="pagesbar">
+            <button class="btn" id="pages-select-all">Select all</button>
+            <button class="btn" id="pages-rot-left" disabled title="Rotate selected pages left">&#8634; Left</button>
+            <button class="btn" id="pages-rot-right" disabled title="Rotate selected pages right">&#8635; Right</button>
+            <button class="btn" id="pages-delete" disabled title="Delete the selected pages">Delete</button>
+            <button class="btn" id="pages-extract" disabled title="Keep only the selected pages">Keep only</button>
+            <button class="btn" id="pages-extract-each" disabled title="Download the selected pages as separate PDFs">Extract as files</button>
+            <span class="count" id="pages-info"></span>
+          </div>
+          <label class="dropzone compact" id="pages-add-dz" tabindex="0" role="button" aria-label="Add PDFs or photos">
+            <span class="dz-title">Add pages from another file</span>
+            <span class="dz-sub">PDFs and photos (JPG, PNG) &middot; their pages are added at the end</span>
+            <input type="file" id="pages-add-input" accept="application/pdf,.pdf,image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" multiple>
+          </label>
+          <div class="pgrid" id="pages-grid" role="list" aria-label="Pages"></div>
+          <button class="primary" id="pages-go" disabled>No changes yet</button>
+        </div>
+        <div class="status" id="pages-status" role="status"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-prepare">
+      <div class="panel-body">
+        <h2>Prepare</h2>
+        <p class="sub">Clean up, read, and shrink the document that's open. Each step applies to it here; download when you're finished.</p>
+        <div class="seg" id="prep-modes" role="tablist" aria-label="Prepare">
+          <button class="segbtn active" role="tab" aria-selected="true" data-mode="meta">Remove hidden info</button>
+          <button class="segbtn" role="tab" aria-selected="false" data-mode="ocr">Make searchable</button>
+          <button class="segbtn" role="tab" aria-selected="false" data-mode="compress">Compress</button>
+        </div>
+        <div id="prep-empty" class="hint">Open a document first — the Document tab.</div>
+        <div id="prep-work" hidden>
+          <div id="prot-meta">
+            <table class="meta-table"><tbody id="meta-table"></tbody></table>
+            <ul class="findings" id="meta-findings"></ul>
+            <div class="checkline" id="meta-opt-authors-line" hidden><input type="checkbox" id="meta-opt-authors" checked><label for="meta-opt-authors">Remove comment author names</label></div>
+            <div class="checkline" id="meta-opt-js-line" hidden><input type="checkbox" id="meta-opt-js" checked><label for="meta-opt-js">Remove JavaScript (form calculations may stop working)</label></div>
+            <div class="checkline" id="meta-opt-att-line" hidden><input type="checkbox" id="meta-opt-att"><label for="meta-opt-att">Remove attached files</label></div>
+            <div class="hint" id="meta-after" hidden>The list above now shows what's left in the cleaned copy.</div>
+            <button class="primary" id="meta-go" disabled>Remove hidden info</button>
+          </div>
+          <div id="opt-ocr">
+            <label class="field-label" for="ocr-lang">Language</label>
+            <select id="ocr-lang"></select>
+            <div class="checkline"><input type="checkbox" id="ocr-skip" checked><label for="ocr-skip">Skip pages that already have text</label></div>
+            <div class="hint">Reads each page at 300 DPI on this device and adds invisible, selectable text over the scan. Nothing is uploaded. Takes a few seconds per page.</div>
+            <button class="primary" id="ocr-go">Make searchable</button>
+          </div>
+          <div id="opt-compress" hidden>
+            <div class="field-label">Image resolution</div>
+            <div class="radios">
+              <label><input type="radio" name="cmp-dpi" value="150" checked> 150 DPI: good for reading and printing</label>
+              <label><input type="radio" name="cmp-dpi" value="72"> 72 DPI: smallest, for email and screens</label>
+            </div>
+            <label class="field-label" for="cmp-q">JPEG quality</label>
+            <div class="size-row"><input type="range" id="cmp-q" min="30" max="85" value="60" step="1"><span id="cmp-qv">60%</span></div>
+            <div class="hint">Photos and scans are resized and recompressed; text, vector graphics and transparency masks are left untouched.</div>
+            <div class="badge" id="cmp-badge" hidden></div>
+            <button class="primary" id="cmp-go">Compress</button>
+          </div>
+          <div class="progress" id="opt-progress" hidden>
+            <div class="ptrack"><div class="pbar" id="opt-bar"></div></div>
+            <div class="prow"><span id="opt-ptext"></span><button class="btn" id="opt-cancel">Stop</button></div>
+          </div>
+        </div>
+        <div class="status" id="prep-status" role="status"></div>
+        <div class="status" id="opt-status" role="status"></div>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-finish">
+      <div class="panel-body">
+        <h2>Finish</h2>
+        <p class="sub">Save the document, lock it with a password, or sign it. Signing and passwords come last: any later change would break them.</p>
+        <div class="seg" id="fin-modes" role="tablist" aria-label="Finish">
+          <button class="segbtn active" role="tab" aria-selected="true" data-mode="save">Save</button>
+          <button class="segbtn" role="tab" aria-selected="false" data-mode="password">Password</button>
+          <button class="segbtn" role="tab" aria-selected="false" data-mode="sign">Digital signature</button>
+        </div>
+        <div id="fin-save">
+          <div class="finishrow">
+            <div>
+              <b id="fin-name">No document open</b>
+              <div class="muted" id="fin-steps"></div>
+            </div>
+            <button class="primary" id="fin-download" disabled>Download PDF</button>
+          </div>
+          <div class="hint">Nothing is written to disk until you download. Everything you have applied is included.</div>
+        </div>
+        <div id="fin-password" hidden>
+          <div class="seg sub-seg" id="pw-modes" role="tablist" aria-label="Password">
+            <button class="segbtn active" role="tab" aria-selected="true" data-mode="lock">Add a password</button>
+            <button class="segbtn" role="tab" aria-selected="false" data-mode="unlock">Remove a password</button>
+          </div>
+          <div id="prot-lock" hidden>
+            <div class="row2">
+              <div><label class="field-label" for="lock-user">Password to open (optional)</label><input type="password" id="lock-user" autocomplete="new-password"></div>
+              <div><label class="field-label" for="lock-user2">Confirm</label><input type="password" id="lock-user2" autocomplete="new-password"></div>
+            </div>
+            <div class="hint" id="lock-user-str"></div>
+            <label class="field-label" for="lock-owner">Permissions password (needed for restrictions)</label>
+            <input type="password" id="lock-owner" autocomplete="new-password">
+            <div class="perm-grid">
+              <label><input type="checkbox" id="lock-print" checked> Allow printing</label>
+              <label><input type="checkbox" id="lock-copy" checked> Allow copying text</label>
+              <label><input type="checkbox" id="lock-annot" checked> Allow comments &amp; form filling</label>
+              <label><input type="checkbox" id="lock-edit" checked> Allow editing &amp; page changes</label>
+            </div>
+            <label class="field-label" for="lock-alg">Encryption</label>
+            <select id="lock-alg"><option value="AES-256" selected>AES-256 (recommended)</option><option value="AES-128">AES-128 (for very old readers)</option></select>
+            <div class="hint">Restrictions are honored by standard PDF readers but aren't a hard barrier; the open password is what actually keeps people out.</div>
+            <div class="warnline" id="lock-msg"></div>
+            <button class="primary" id="lock-go" disabled>Protect &amp; download</button>
+          </div>
+        <div id="prot-unlock" hidden>
+          <label class="dropzone compact" id="unlock-dz" tabindex="0" role="button" aria-label="Choose a password-protected PDF">
+            <span class="dz-title" id="unlock-name">Choose a protected PDF</span>
+            <span class="dz-sub" id="unlock-meta">Choose a file or drag it here</span>
+            <input type="file" id="unlock-input" accept="application/pdf,.pdf">
+          </label>
+          <div id="unlock-work" hidden>
+            <div class="hint" id="unlock-hint" style="margin-top:12px;"></div>
+            <div class="proprow">
+              <input type="password" id="unlock-pw" placeholder="Password" autocomplete="off" aria-label="Password">
+              <label class="muted" style="display:flex;gap:6px;align-items:center;"><input type="checkbox" id="unlock-show"> Show</label>
+            </div>
+            <button class="primary" id="unlock-go">Remove password</button>
+          </div>
+        </div>
+        </div>
+        <div id="fin-sign" hidden>
+          <div class="seg sub-seg" id="dg-modes" role="tablist" aria-label="Digital signature">
+            <button class="segbtn active" role="tab" aria-selected="true" data-mode="sign">Sign this document</button>
+            <button class="segbtn" role="tab" aria-selected="false" data-mode="verify">Check signatures</button>
+            <button class="segbtn" role="tab" aria-selected="false" data-mode="create">Create an ID</button>
+          </div>
+        <div id="dg-sign">
+          <div class="docfile"><span class="muted">Signing:</span> <b id="dg-doc-name">No document open</b></div>
+          <div class="sigbox">
+            <div class="sighead">Your digital ID</div>
+            <div class="sigrow current" id="dg-id-card" hidden>
+              <span class="grow"><b id="dg-id-who"></b><br><span class="muted" id="dg-id-meta"></span></span>
+            </div>
+            <label class="dropzone compact" id="dg-pfx-dz" tabindex="0" role="button" aria-label="Choose your digital ID file">
+              <span class="dz-title">Load a digital ID</span>
+              <span class="dz-sub" id="dg-pfx-name">Choose your .pfx or .p12 file</span>
+              <input type="file" id="dg-pfx-input" accept=".pfx,.p12,application/x-pkcs12">
+            </label>
+            <div class="proprow" id="dg-pfx-unlock" hidden>
+              <input type="password" id="dg-pfx-pw" placeholder="Digital ID password" autocomplete="off" aria-label="Digital ID password">
+              <button class="btn strong" id="dg-pfx-open">Unlock</button>
+            </div>
+            <div class="hint">The ID stays in this tab's memory only and is forgotten when you close it or tap Clear.</div>
+          </div>
+          <div class="row2">
+            <div><label class="field-label" for="dg-reason">Reason (optional)</label><input type="text" id="dg-reason" placeholder="e.g. I approve this document" maxlength="120"></div>
+            <div><label class="field-label" for="dg-location">Location (optional)</label><input type="text" id="dg-location" placeholder="__LOCATION__" maxlength="80"></div>
+          </div>
+          <div class="checkline"><input type="checkbox" id="dg-visible" checked><label for="dg-visible">Show a signature block on the last page</label></div>
+          <div class="warnline" id="dg-sign-msg"></div>
+          <button class="primary" id="dg-sign-go" disabled>Sign &amp; download</button>
+        </div>
+
+        <div id="dg-verify" hidden>
+          <label class="dropzone compact" id="dgv-dz" tabindex="0" role="button" aria-label="Choose a PDF to check">
+            <span class="dz-title">PDF to check</span>
+            <span class="dz-sub" id="dgv-name">Choose a file or drag it here</span>
+            <input type="file" id="dgv-input" accept="application/pdf,.pdf">
+          </label>
+          <div id="dgv-results"></div>
+        </div>
+
+        <div id="dg-create" hidden>
+          <div class="row2">
+            <div><label class="field-label" for="dg-name">Name on signatures</label><input type="text" id="dg-name" maxlength="64" autocomplete="name"></div>
+            <div><label class="field-label" for="dg-email">Email (optional)</label><input type="text" id="dg-email" maxlength="100" autocomplete="email" inputmode="email"></div>
+          </div>
+          <div class="row2">
+            <div><label class="field-label" for="dg-org">Organization (optional)</label><input type="text" id="dg-org" maxlength="64" value="__ORG_DEFAULT__"></div>
+            <div><label class="field-label" for="dg-years">Valid for</label>
+              <select id="dg-years"><option value="1">1 year</option><option value="2">2 years</option><option value="3" selected>3 years</option><option value="5">5 years</option></select></div>
+          </div>
+          <div class="row2">
+            <div><label class="field-label" for="dg-pw">Password (10+ characters)</label><input type="password" id="dg-pw" autocomplete="new-password"></div>
+            <div><label class="field-label" for="dg-pw2">Confirm password</label><input type="password" id="dg-pw2" autocomplete="new-password"></div>
+          </div>
+          <div class="warnline" id="dg-create-msg">Enter the name to show on signatures.</div>
+          <button class="primary" id="dg-create-go" disabled>Create digital ID</button>
+          <div class="sigbox" id="dg-created" hidden>
+            <div class="sighead">Your new digital ID</div>
+            <div class="proprow">
+              <button class="btn strong" id="dg-dl-pfx">Download .pfx (private, keep safe)</button>
+              <button class="btn" id="dg-dl-cer">Download .cer (public, share it)</button>
+            </div>
+            <div class="hint">Fingerprint: <code id="dg-created-fp"></code></div>
+            <div class="hint">It's loaded and ready: switch to Sign a PDF to use it. This is a self-signed ID, which is good for proving a file wasn't changed. Adobe will show it as "validity unknown" until the recipient chooses to trust your .cer file.</div>
+          </div>
+        </div>
+        </div>
+        <div class="status" id="fin-status" role="status"></div>
+        <div class="status" id="dg-status" role="status"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
