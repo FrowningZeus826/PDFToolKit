@@ -1,0 +1,9 @@
+.tarballs/
+cantoo/
+fonts/
+pdfjs4/
+vend/
+dist/
+tests/node_modules/
+tests/fx/
+tests/rp.png

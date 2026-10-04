@@ -49,7 +49,7 @@ c = canvas.Canvas('fx/letter.pdf', pagesize=letter)
 t = c.beginText(1*inch, 9.5*inch); t.setFont('Lib', 11); t.setLeading(13.2)
 for line in ["Dear Parent or Guardian,", "",
              "Northfield Unit 5 will hold its annual technology night on Thursday,",
-             "October 9 at the district office. Staff will demonstrate the tools students use",
+             "October 9 at the main office. Staff will demonstrate the tools students use",
              "each day, answer questions about device care, and collect signed permission",
              "forms for the coming semester.", "",
              "Please return the attached form by Friday, October 3.", "",

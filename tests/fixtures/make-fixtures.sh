@@ -13,6 +13,19 @@ node fixtures/fixtures2.js
 echo "==> scans for OCR (English + Spanish) and a photo-heavy PDF for the compressor"
 node fixtures/mkscan.js
 node fixtures/mkspa.js
+echo "==> source images for the photo-heavy PDF"
+python3 - <<'PY'
+import random
+from PIL import Image, ImageFilter
+random.seed(7)
+# noisy, photo-like content so the JPEG is large enough for the compressor to shrink
+im=Image.effect_noise((1600,1200),90).convert('RGB').filter(ImageFilter.GaussianBlur(1))
+im.save('fx/photo-src.jpg', quality=95)
+al=Image.new('RGBA',(600,600),(0,0,0,0))
+from PIL import ImageDraw
+d=ImageDraw.Draw(al); d.ellipse([40,40,560,560],fill=(200,40,40,200)); d.ellipse([200,200,400,400],fill=(20,60,160,90))
+al.save('fx/alpha-src.png')
+PY
 node fixtures/mkphoto.js
 
 echo "==> photos, for adding images as pages in Merge"
