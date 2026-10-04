@@ -232,8 +232,23 @@
   .docbar .status:empty { display: none; }
   /* ---------- Document workspace: icon strip | page | properties ---------- */
   .workarea { display: grid; grid-template-columns: 56px minmax(0, 1fr) 0px; gap: 16px; align-items: start; margin-top: 6px; }
-  .stagecol .stage-wrap { max-height: calc(100vh - 140px); }
-  .workarea.has-props { grid-template-columns: 56px minmax(0, 1fr) 300px; }
+  .stagecol .stage-wrap { max-height: calc(100vh - 120px); }
+  /* Document first: the properties column floats over the page rather than taking a third
+     of the width from it. It still sits in the grid on wide screens, where there is room
+     for both; below that it becomes a panel over the page edge. */
+  .workarea.has-props { grid-template-columns: 56px minmax(0, 1fr) 320px; }
+  @media (max-width: 1500px) {
+    .workarea.has-props { grid-template-columns: 56px minmax(0, 1fr) 0px; }
+    .workarea.has-props .ctlcol {
+      position: fixed; right: 16px; top: 128px; width: 340px; max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 160px); overflow: auto; z-index: 45;
+      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px;
+    }
+  }
+  @media (max-width: 760px) {
+    .workarea.has-props .ctlcol { position: static; width: auto; max-height: none; box-shadow: none; padding: 0; border: none; background: none; }
+  }
   /* above the page: the page column paints later in the document, so the strip needs
      its own stacking context to keep tooltips on top */
   .toolstrip { position: sticky; top: 74px; z-index: 40; }
@@ -263,6 +278,10 @@
   .trun.sel { background: rgba(255,182,18,0.28); outline: 2px solid var(--gold-dim); }
   .trun.changed { background: rgba(47,158,91,0.22); outline: 1px solid rgba(47,158,91,0.6); }
   .tmask { position: absolute; background: #fff; pointer-events: none; }
+  /* the caret layer sits above the block outline, or clicks never reach the text */
+  .tprev[contenteditable="true"] { outline: none; caret-color: var(--gold-dim); cursor: text;
+    pointer-events: auto; white-space: pre; z-index: 7; }
+  .tprev[contenteditable="true"]:focus { background: rgba(255,182,18,0.10); }
   .tprev { position: absolute; white-space: nowrap; pointer-events: none; line-height: 1; transform: translateY(-0.84em); }
   .tgrip { position: absolute; right: -7px; top: 50%; width: 14px; height: 26px; margin-top: -13px; border-radius: 3px;
     background: var(--gold); border: 1px solid var(--gold-dim); cursor: ew-resize; pointer-events: auto; }
@@ -287,6 +306,34 @@
   .tsplit:hover { background: var(--gold); border-color: var(--gold-dim); }
   /* text that comes from a reusable block, and the stronger mark when it is shared */
   .trun.block.fromblock { outline-style: dashed; }
+  /* quiet until pointed at: the page comes first, the boxes appear when wanted */
+  /* self-test overlay */
+  .selftest { position: fixed; inset: 24px; z-index: 200; overflow: auto; padding: 16px 20px;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 16px 48px rgba(0,0,0,.35); }
+  .selftest .st-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; font-size: 16px; }
+  .selftest .st-head .btn { margin-left: auto; }
+  .selftest ol { margin: 0; padding-left: 22px; line-height: 1.7; font-size: 14px; }
+  .selftest li.ok::marker { color: var(--good); }
+  .selftest li.bad { color: var(--bad); font-weight: 600; }
+  .selftest .ok { color: var(--good); }
+  .selftest .bad { color: var(--bad); }
+  /* the editing ribbon: fixed above the page, like a word processor's */
+  .ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 8px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+  .ribbon .btn { padding: 5px 10px; font-size: 13px; }
+  .ribbon-sep { width: 1px; height: 22px; background: var(--line); }
+  .ribbon-field { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); }
+  .ribbon-field select { max-width: 190px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .ribbon-field input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; }
+  .ribbon-note.warn { color: var(--bad); }
+  .groupctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
+  .groupctl input[type=range] { width: 92px; }
+  .groupctl span { min-width: 54px; }
+  .trun.alongside { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.12); }
+  .trun.quiet { background: transparent; outline-color: transparent; }
+  .trun.quiet:hover { background: rgba(46,111,216,0.13); outline: 1px solid rgba(46,111,216,0.35); }
+  .trun.locked.quiet:hover { background: rgba(0,0,0,0.05); outline: 1px dashed rgba(0,0,0,0.3); }
   .trun.block.shared { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.10); }
   .trun.block.mergeable { outline: 2px dashed var(--gold-dim); background: rgba(255,182,18,0.12); cursor: copy; }
   .btn.armed { background: var(--gold); color: var(--black); border-color: var(--gold-dim); }

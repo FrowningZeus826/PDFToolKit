@@ -199,7 +199,11 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    await p.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
    await p.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=text]').click());
    await p.waitForFunction(()=>document.querySelectorAll('.trun.block').length>0,{timeout:30000}); await sleep(700); };
- const pickBlock=async i=>{ await p.$eval('#estage',e=>e.scrollIntoView({block:'center'})); await sleep(200);
+ // scroll the block itself into view and measure immediately before clicking: the ribbon
+ // and the floating panel both shift the page, so a rect measured earlier can be stale
+ const pickBlock=async i=>{
+   await p.evaluate(i=>{const e=document.querySelectorAll('.trun.block')[i]; if(e) e.scrollIntoView({block:'center'});}, i);
+   await sleep(250);
    const spot=await p.evaluate(i=>{const e=document.querySelectorAll('.trun.block')[i]; const r=e.getBoundingClientRect(); return {x:r.left+4,y:r.top+4};}, i);
    await p.mouse.click(spot.x, spot.y); await sleep(500); };
 
@@ -248,6 +252,95 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      before && after && Math.abs(after[0]-before[0])<2 && Math.abs(after[1]-before[1])<2 && Math.abs((after[3]-after[1])-(before[3]-before[1]))<2,
      `${before} -> ${after}`); }
  await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000);
+
+ // ---- the ribbon: the controls stay above the page instead of in a side panel ----
+ await openText('letter.pdf');
+ { const ids=await p.evaluate(()=>[...document.querySelectorAll('#tx-ribbon button, #tx-ribbon select, #tx-ribbon input')].map(e=>e.id));
+   check('ribbon: the editing controls sit above the page',
+     ['tx-group','tx-showall','tx-merge','tx-split','rb-font','rb-size'].every(id=>ids.includes(id)), ids.join(','));
+   check('ribbon: it is there before anything is selected', !(await p.$eval('#tx-ribbon',e=>e.hidden)));
+   await pickBlock(1);
+   check('ribbon: it shows the block font and size once something is selected',
+     (await p.$$eval('#rb-font option',o=>o.length))>0 && +(await p.$eval('#rb-size',e=>e.value))>0,
+     (await p.$eval('#rb-size',e=>e.value))+'pt');
+   const before=await p.$eval('#tx-text',e=>e.value);
+   await p.evaluate(()=>{const s=document.getElementById('rb-size'); s.value='16'; s.dispatchEvent(new Event('input'));}); await sleep(500);
+   check('ribbon: changing the size there changes the block', /text edit/.test(await txt(p,'#edit-summary')) && (await p.$eval('#tx-text',e=>e.value))===before);
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()).catch(()=>{}); await sleep(600); }
+
+ // ---- text re-wraps inside its block while being typed ----
+ await openText('letter.pdf');
+ { await pickBlock(1); await sleep(200);
+   await p.keyboard.press('Enter'); await sleep(600);
+   check('wrapping: Enter puts the caret in the text', (await p.$$eval('.tprev',els=>els.filter(e=>e.isContentEditable).length))>0);
+   const lines0=(await p.$eval('#tx-text',e=>e.value)).split('\n').length;
+   await p.keyboard.type(' and then a good deal more text typed into this line so that it has to wrap onto another'); await sleep(1300);
+   const lines1=(await p.$eval('#tx-text',e=>e.value)).split('\n').length;
+   check('wrapping: the paragraph gains lines rather than running off the edge', lines1>lines0, `${lines0} lines, then ${lines1}`);
+   const over=await p.evaluate(()=>{const blk=document.querySelectorAll('.trun.block')[1].getBoundingClientRect();
+     return Math.max(...[...document.querySelectorAll('.tprev')].map(e=>e.getBoundingClientRect().width)) - blk.width;});
+   check('wrapping: no line is wider than the block it sits in', over<=2, Math.round(over)+'px over');
+   await p.keyboard.press('Escape'); await sleep(300);
+   check('wrapping: Escape leaves the text', (await p.$$eval('.tprev',els=>els.filter(e=>e.isContentEditable).length))===0);
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()).catch(()=>{}); await sleep(800); }
+
+ // ---- typing on the page itself, rather than in the side panel ----
+ await openText('letter.pdf');
+ { await pickBlock(1); await sleep(400);
+   check('on-page editing: a block is not editable until asked',
+     (await p.$$eval('.tprev',els=>els.filter(e=>e.isContentEditable).length))===0);
+   // two presses on the block start typing on the page; one press still selects and drags
+   const at=async()=>p.evaluate(()=>{const e=document.querySelectorAll('.trun.block')[1]; const r=e.getBoundingClientRect(); return {x:r.left+30,y:r.top+8};});
+   let bs=await at(); await p.mouse.click(bs.x,bs.y); await sleep(300);
+   bs=await at(); await p.mouse.click(bs.x,bs.y); await sleep(700);
+   check('on-page editing: the text becomes editable where it sits',
+     (await p.$$eval('.tprev',els=>els.filter(e=>e.isContentEditable).length))>0);
+   check('on-page editing: the caret lands in the text', await p.evaluate(()=>!!document.activeElement && document.activeElement.classList.contains('tprev')));
+   await p.keyboard.type('ZZ'); await sleep(600);
+   check('on-page editing: the panel stays in step with what was typed', /ZZ/.test(await p.$eval('#tx-text',e=>e.value)));
+   check('on-page editing: it counts as a change', /text edit/.test(await txt(p,'#edit-summary')), await txt(p,'#edit-summary'));
+   await H.applyAndDownload(p,'#edit-go'); d=await H.takeDownloads(p,1); fs.writeFileSync('onpage.pdf',d[0].buf);
+   const t=execSync('pdftotext onpage.pdf - 2>/dev/null').toString().replace(/\s+/g,' ');
+   check('on-page editing: the typing reaches the saved file', /ZZ/.test(t));
+   check('on-page editing: the rest of the page is untouched', t.includes('Dear Parent') && t.includes('Sincerely'));
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000); }
+
+ // ---- the grouping slider, for documents the default reads wrongly ----
+ await openText('quote.pdf');
+ { const setLevel=async l=>{ await p.evaluate(v=>{const s=document.getElementById('tx-group'); s.value=String(v); s.dispatchEvent(new Event('input'));}, l);
+     await sleep(2600); return (await p.$$('.trun.block')).length; };
+   const normal=await setLevel(1), loose=await setLevel(2);
+   check('grouping slider: loosening pulls more text together', loose<normal, `${normal} blocks at Normal, ${loose} at Loose`);
+   check('grouping slider: it names the setting', ['Tight','Normal','Loose','Loosest'].includes(await txt(p,'#tx-group-name')), await txt(p,'#tx-group-name'));
+   const tight=await setLevel(0);
+   check('grouping slider: tightening does not pull more together', tight>=normal, `${tight} at Tight vs ${normal} at Normal`);
+   await setLevel(1);
+   // the table must survive the default, which is what the default is for
+   let cells=0;
+   { const n=(await p.$$('.trun.block')).length;
+     for (let i=0;i<n;i++){ await pickBlock(i); const v=await p.$eval('#tx-text',e=>e.value);
+       if (/^(AA250-NA|156\.99|AD630-SC|43\.25)$/.test(v.trim())) cells++; } }
+   check('grouping slider: at Normal a table keeps its cells apart', cells>=3, cells+' separate cells found');
+   // and the setting is remembered
+   await setLevel(2);
+   check('grouping slider: the choice is remembered', (await p.evaluate(()=>localStorage.getItem('pdf-tools:grouping')))==='2');
+   await setLevel(1); }
+
+ // ---- a page drawn one word at a time must still read as paragraphs ----
+ await openText('word-runs.pdf');
+ { const n=(await p.$$('.trun.block')).length;
+   check('word runs: a page drawn word by word does not become a box per word', n<=4, n+' blocks for 3 lines and a table row');
+   await pickBlock(0);
+   const t=await p.$eval('#tx-text',e=>e.value);
+   check('word runs: the words join into lines, with spaces in the right places',
+     /^The quick brown fox jumps over the lazy dog near the river/.test(t), JSON.stringify(t.slice(0,60)));
+   check('word runs: the lines of the paragraph group together', t.split('\n').length===3, t.split('\n').length+' lines');
+   // the alternating font resources must not stop the join, but a column gap must
+   let label=-1, number=-1;
+   for (let i=0;i<n;i++){ await pickBlock(i); const v=await p.$eval('#tx-text',e=>e.value);
+     if (/Widget assembly/.test(v)) label=i; if (v.trim()==='16') number=i; }
+   check('word runs: a table row stays as separate columns', label>=0 && number>=0 && label!==number,
+     `label block ${label}, number block ${number}`); }
 
  // ---- correcting the grouping by hand, and the vertical grips ----
  const shape=async()=>(await p.$$eval('.trun.block',es=>es.map(e=>+e.title.match(/^(\d+)/)[1]))).join(',');
@@ -428,6 +521,96 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    await pickBlock(i);
    check('reusable block used once: the panel says the change stays on this page',
      /stays here/.test(await txt(p,'#tx-shared')) && (await p.$eval('#tx-shared',e=>e.className))==='hint', await txt(p,'#tx-shared')); }
+
+ // ---- a redaction must clear its area in one pass, measured by word coordinates ----
+ { await upload(p,'#edit-input',FX('letter.pdf'));
+   await p.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
+   await p.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=redact]').click()); await sleep(2200);
+   await p.evaluate(()=>document.getElementById('estage').scrollIntoView({block:'center'})); await sleep(400);
+   const st=await (await p.$('#estage')).boundingBox();
+   // a band across the middle of the paragraph, cutting words at both edges
+   await p.mouse.move(st.x+st.width*0.28, st.y+st.height*0.30); await p.mouse.down();
+   await p.mouse.move(st.x+st.width*0.72, st.y+st.height*0.42,{steps:10}); await p.mouse.up(); await sleep(700);
+   await H.applyAndDownload(p,'#edit-go'); d=await H.takeDownloads(p,1); fs.writeFileSync('red-area.pdf',d[0].buf);
+   // read the marker back out of the file, so the check uses the real rectangle
+   const stream=execSync('qpdf --qdf --object-streams=disable red-area.pdf - 2>/dev/null').toString('latin1');
+   const m=stream.match(/q 0 0 0 rg ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) re f Q/);
+   check('redact: the marker is written into the page', !!m);
+   if (m) {
+     const [x,y,w,h]=m.slice(1).map(Number);
+     const words=f=>{ const o=execSync(`pdftotext -f 1 -l 1 -bbox ${f} - 2>/dev/null`).toString();
+       const out=[]; const re=/<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">([^<]*)<\/word>/g; let a;
+       while((a=re.exec(o))) out.push([ +a[1], 792-(+a[4]), +a[3], 792-(+a[2]), a[5] ]);
+       return out; };
+     const hit=b=>b[0]<x+w && b[2]>x && b[1]<y+h && b[3]>y;
+     const before=words('fx/letter.pdf').filter(hit), after=words('red-area.pdf').filter(hit);
+     check('redact: one pass clears every word in the area', before.length>0 && after.length===0,
+       `${before.length} words before, ${after.length} after: ${after.map(w2=>w2[4]).join(',')}`);
+     check('redact: text outside the area survives', words('red-area.pdf').filter(b=>!hit(b)).length>0);
+   }
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000); }
+
+ // ---- a new text box can use one of the document's own fonts ----
+ { await upload(p,'#edit-input',FX('quote.pdf'));
+   await p.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
+   await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await sleep(300);
+   const st=await (await p.$('#estage')).boundingBox();
+   await p.mouse.click(st.x+st.width*0.25, st.y+st.height*0.62); await sleep(900);
+   await p.keyboard.type('Added in the document font'); await sleep(500);
+   const opts=await p.$$eval('#ep-font option',os=>os.map(o=>o.value));
+   check('new text: the page own fonts are offered alongside the built-in ones',
+     opts.some(v=>v.startsWith('doc:')) && opts.includes('Helvetica'), opts.slice(0,3).join(','));
+   await p.evaluate(()=>{const s=document.getElementById('ep-font');
+     const o=[...s.options].find(x=>x.value.startsWith('doc:')); s.value=o.value; s.dispatchEvent(new Event('change'));});
+   await sleep(600);
+   await H.applyAndDownload(p,'#edit-go'); d=await H.takeDownloads(p,1); fs.writeFileSync('newtext.pdf',d[0].buf);
+   const t=execSync('pdftotext newtext.pdf - 2>/dev/null').toString();
+   // reading it back proves the character codes written for that font are right
+   check('new text: it reads back exactly as typed', t.includes('Added in the document font'));
+   const fonts=execSync('pdffonts newtext.pdf 2>/dev/null').toString().split('\n').slice(2).map(l=>l.trim().split(/\s+/)[0]).filter(Boolean);
+   check('new text: no extra font was embedded for it', fonts.length<=3, fonts.join(','));
+   check('new text: the rest of the page is untouched', t.includes('Q57659') && t.includes('1,486.70'));
+   check('new text: output is structurally valid', /No syntax/.test(execSync('qpdf --check newtext.pdf 2>&1 || true').toString()));
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000); }
+
+ // ---- the page comes first: blocks are quiet until pointed at, or shown on request ----
+ await openText('letter.pdf');
+ { const toggle=async()=>{ await p.evaluate(()=>document.getElementById('tx-showall').click()); await sleep(400); };
+   const quiet=async()=>(await p.$$('.trun.quiet')).length;
+   const total=async()=>(await p.$$('.trun')).length;
+   const first=await quiet();
+   await toggle();
+   const second=await quiet();
+   check('reveal: the toggle switches between showing every block and none', first!==second && (first===0 || second===0),
+     `${first} quiet, then ${second} of ${await total()}`);
+   check('reveal: the toggle reports its state for assistive tech',
+     ['true','false'].includes(await p.$eval('#tx-showall',e=>e.getAttribute('aria-pressed'))));
+   // quiet blocks still light up under the pointer
+   if (await quiet() === 0) await toggle();
+   { const spot=await p.evaluate(()=>{const e=document.querySelector('.trun.block'); const r=e.getBoundingClientRect(); return {x:r.left+4,y:r.top+4};});
+     await p.mouse.move(spot.x,spot.y); await sleep(300);
+     const bg=await p.evaluate(()=>getComputedStyle(document.querySelector('.trun.block')).backgroundColor);
+     check('reveal: a quiet block still appears when hovered', bg!=='rgba(0, 0, 0, 0)', bg); }
+   await toggle(); }
+
+ // ---- text that cannot be rewritten can still be removed ----
+ await openText('locked-text.pdf');
+ { const locked=await p.$$('.trun.locked');
+   check('locked text: it is found and marked', locked.length>0, locked.length+' runs');
+   const spot=await p.evaluate(()=>{const e=document.querySelector('.trun.locked'); e.scrollIntoView({block:'center'});
+     const r=e.getBoundingClientRect(); return {x:r.left+4,y:r.top+4,title:e.title};});
+   check('locked text: the tooltip says it can still be removed', /can still be removed/.test(spot.title), spot.title.slice(0,60));
+   await p.mouse.click(spot.x,spot.y); await sleep(500);
+   check('locked text: selecting it offers removal', !(await p.$eval('#tx-locked',e=>e.hidden)));
+   check('locked text: the panel says what else will go', /Nothing else is drawn|also removes/.test(await txt(p,'#tx-locked-extent')), await txt(p,'#tx-locked-extent'));
+   await p.evaluate(()=>document.getElementById('tx-locked-go').click()); await sleep(500);
+   check('locked text: the removal is staged', /text edit/.test(await txt(p,'#edit-summary')), await txt(p,'#edit-summary'));
+   await H.applyAndDownload(p,'#edit-go'); d=await H.takeDownloads(p,1); fs.writeFileSync('locked-out.pdf',d[0].buf);
+   const t=execSync('pdftotext locked-out.pdf - 2>/dev/null').toString();
+   check('locked text: it is gone from the saved file', !t.includes('Stretched line'));
+   check('locked text: the lines around it are untouched', t.includes('Ordinary line') && t.includes('Another ordinary'));
+   check('locked text: output is structurally valid', /No syntax/.test(execSync('qpdf --check locked-out.pdf 2>&1 || true').toString()));
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000); }
 
  // ---- why a block can't be edited ----
  await openText('type3.pdf');

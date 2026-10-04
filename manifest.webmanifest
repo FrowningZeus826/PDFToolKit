@@ -1,0 +1,38 @@
+{
+  "name": "PDF Tool Kit",
+  "short_name": "PDF Tool Kit",
+  "description": "Edit, sign, redact and organise PDFs entirely in your browser.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#16181D",
+  "theme_color": "#16181D",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "file_handlers": [
+    {
+      "action": ".",
+      "accept": {
+        "application/pdf": [
+          ".pdf"
+        ]
+      },
+      "launch_type": "single-client"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  }
+}

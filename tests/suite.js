@@ -39,6 +39,20 @@ const tool=(p,name)=>p.click(`.rail-btn[data-tool=${name}]`);
  const b=await puppeteer.launch({executablePath:await chromium.executablePath(),args:chromium.args,headless:true});
 
 
+ // ---------- 0. The self-test the tool carries for other browsers ----------
+ { const {p,errors}=await newPage(b,LOCAL,false);
+   await p.click('#run-selftest');          // the button people actually press
+   await p.waitForSelector('.selftest',{timeout:30000});
+   await p.waitForFunction(()=>{const e=document.getElementById('st-sum'); return e && /(All \d+ checks passed|FAILED)/.test(e.textContent);},{timeout:180000});
+   const sum=await txt(p,'#st-sum');
+   check('self-test: it runs from the button and reaches a verdict', /All \d+ checks passed|FAILED/.test(sum), sum.slice(0,70));
+   check('self-test: every check passes in this browser', /All \d+ checks passed/.test(sum), sum.slice(0,90));
+   const lines=await p.$$eval('#st-list li',ls=>ls.length);
+   check('self-test: it covers the whole tool, not a token check', lines>=10, lines+' checks');
+   check('self-test: it reports the browser it ran in', /Browser:/.test(await txt(p,'#st-env')));
+   check('self-test: no script errors while running it', errors.length===0, errors.slice(0,2).join(' | '));
+   await p.close(); }
+
  // ---------- 1. Mobile: every upload area opens the picker exactly once ----------
  {
   const {p,errors}=await newPage(b,LOCAL,true);

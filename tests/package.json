@@ -5,7 +5,7 @@
   "description": "Browser test suites (headless Chromium + external PDF validators)",
   "scripts": {
     "fixtures": "bash fixtures/make-fixtures.sh",
-    "test": "node suite.js && node edits.js && node adv.js && node offline.js"
+    "test": "node suite.js && node edits.js && node adv.js && node offline.js && node pwa.js"
   },
   "dependencies": {
     "@sparticuz/chromium": "131.0.1",

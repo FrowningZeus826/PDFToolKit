@@ -16,6 +16,13 @@ fontjs='window.__PDFTOOLS_FONTS='+json.dumps([[f,w,base64.b64encode(open(p,'rb')
 import os
 std={n:base64.b64encode(open(SF+n,'rb').read()).decode() for n in sorted(os.listdir(SF)) if n.endswith(('.pfb','.ttf'))}
 fontjs+='window.__PDFTOOLS_STD_FONTS='+json.dumps(std)+';'
+def firstPath(*paths):
+    # fetch-deps.sh unpacks the npm tarball, which puts everything under package/. An older
+    # working tree had it under node_modules/. Accept either, so a fresh clone builds.
+    for p in paths:
+        if os.path.exists(p): return p
+    raise SystemExit('missing dependency: ' + paths[0] + ' (run ./fetch-deps.sh first)')
+
 def lib(p):
     s=open(p,encoding='utf-8').read().replace('\ufffd','\\uFFFD')
     s=re.sub(r'//# sourceMappingURL=.*$','',s,flags=re.M)
@@ -49,7 +56,8 @@ def mjs(path, glob, names=None):
     return src + '\nglobalThis.' + glob + ' = {' + ','.join(pairs) + '};\n'
 
 scripts=[('fonts: Inter, Barlow Condensed, Great Vibes, Dancing Script, Allura (OFL-1.1); Homemade Apple (Apache-2.0); PDF standard fonts: Foxit (BSD-style, see pdf.js), Liberation Sans (OFL-1.1)',fontjs),
-         ('@cantoo/pdf-lib 2.11.1, maintained fork of pdf-lib (MIT)',lib('cantoo/node_modules/@cantoo/pdf-lib/dist/pdf-lib.min.js')),
+         ('@cantoo/pdf-lib 2.11.1, maintained fork of pdf-lib (MIT)',lib(firstPath('cantoo/package/dist/pdf-lib.min.js',
+                                      'cantoo/node_modules/@cantoo/pdf-lib/dist/pdf-lib.min.js'))),
          ('pdf.js 4.10.38 worker, run in-page (Apache-2.0)',mjs('pdfjs4/package/legacy/build/pdf.worker.min.mjs','pdfjsWorker',['WorkerMessageHandler']),'module'),
          ('pdf.js 4.10.38 (Apache-2.0)',mjs('pdfjs4/package/legacy/build/pdf.min.mjs','pdfjsLib'),'module'),
          ('node-forge 1.4.0 (BSD-3-Clause)',lib('vend/node-forge-1.4.0/package/dist/forge.min.js')),
@@ -113,7 +121,8 @@ PLAIN_THEME = '''
 BRANDS = {
   'kit': { 'title': 'PDF Tool Kit', 'org': '', 'logo_alt': '', 'location': 'e.g. Springfield, IL',
            'logo': False, 'file': 'index', 'theme': PLAIN_THEME,
-           'badge': 'Everything runs in your browser' },
+           'badge': 'Everything runs in your browser', 'pwa': True,
+           'storage_key': 'pdf-tool-kit:signature' },
 }
 
 def brandify(markup, brand):
@@ -138,16 +147,23 @@ def build(strict, brand=None):
     app_src = app
     if brand.get('storage_key'):
         app_src = app_src.replace('"pdf-tool-kit:signature"', '"%s"' % brand['storage_key'])
+    pre = [('installed-app flag', 'window.__PDFKIT_PWA=1;', 'classic')] if brand.get('pwa') else []
     sc = variant(['eng','spa'] if strict else ['eng'],
-                 scripts + [('PDF Tools app', app_src, 'module')])
+                 pre + scripts + [('PDF Tools app', app_src, 'module')])
     hashes=["'sha256-"+base64.b64encode(hashlib.sha256(s.encode('utf-8')).digest()).decode()+"'" for _,s,_ in sc]
     head='<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="UTF-8">\n'
     if strict:
+        # The installed app needs its manifest, its own service worker, and permission to
+        # fetch this one page in order to cache it. No other origin is allowed, ever.
+        extra = ("manifest-src 'self'; worker-src 'self'; connect-src 'self'"
+                 if brand.get('pwa') else "manifest-src 'none'; worker-src 'none'; connect-src 'none'")
         csp=("default-src 'none'; script-src "+" ".join(hashes)+" 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; "
-             "font-src data:; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; "
+             "font-src data:; "+extra+"; media-src 'none'; object-src 'none'; frame-src 'none'; "
              "base-uri 'none'; form-action 'none'")
         head+='<meta http-equiv="Content-Security-Policy" content="'+csp+'">\n<meta name="referrer" content="no-referrer">\n'
     head+='<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<title>'+brand['title']+'</title>\n'
+    if brand.get('pwa'):
+        head+='<link rel="manifest" href="manifest.webmanifest">\n<meta name="theme-color" content="#16181D">\n'
     sheet = css
     if brand.get('theme'):
         sheet = sheet.replace('</style>', brand['theme'] + '</style>') if '</style>' in sheet else sheet + '<style>' + brand['theme'] + '</style>'
@@ -161,8 +177,78 @@ def build(strict, brand=None):
     return html
 OUT=os.environ.get('OUT_DIR','dist')
 os.makedirs(OUT,exist_ok=True)
-# One output: the single strict Content-Security-Policy file that gets published.
-open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(build(True, BRANDS['kit']))
 
-print('built index.html:', len(build(True, BRANDS['kit']).encode()), 'bytes')
+# ---------- Installed-app files (hosted build only) ----------
+# A manifest, icons and a service worker. The file handler is what puts the app in Windows'
+# "Open with" list and the ChromeOS Files app, so a PDF can be opened straight into it, or
+# the app set as the default for .pdf.
+def pwa_files(out_dir, brand, version):
+    icon_svg = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>"
+                "<rect width='512' height='512' rx='96' fill='#16181D'/>"
+                "<rect x='136' y='96' width='208' height='272' rx='16' fill='#F7F8FA'/>"
+                "<path d='M296 96v56h56' fill='none' stroke='#16181D' stroke-width='16'/>"
+                "<rect x='168' y='200' width='144' height='16' rx='8' fill='#6E8BFA'/>"
+                "<rect x='168' y='240' width='144' height='16' rx='8' fill='#6E8BFA'/>"
+                "<rect x='168' y='280' width='96' height='16' rx='8' fill='#6E8BFA'/>"
+                "<rect x='136' y='392' width='240' height='24' rx='12' fill='#6E8BFA'/></svg>")
+    open(os.path.join(out_dir, 'icon.svg'), 'w', encoding='utf-8').write(icon_svg)
+    # the maskable variant keeps the artwork inside the safe area, so it is simply padded
+    open(os.path.join(out_dir, 'icon-maskable.svg'), 'w', encoding='utf-8').write(
+        icon_svg.replace("viewBox='0 0 512 512'", "viewBox='-64 -64 640 640'"))
+
+    manifest = {
+        "name": brand['title'],
+        "short_name": brand['title'],
+        "description": "Edit, sign, redact and organise PDFs entirely in your browser.",
+        "start_url": ".", "scope": ".", "display": "standalone",
+        "background_color": "#16181D", "theme_color": "#16181D",
+        "icons": [
+            {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
+            {"src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable"},
+        ],
+        # the part the operating system reads when offering an app for a .pdf
+        "file_handlers": [{"action": ".", "accept": {"application/pdf": [".pdf"]},
+                           "launch_type": "single-client"}],
+        "launch_handler": {"client_mode": "focus-existing"},
+    }
+    open(os.path.join(out_dir, 'manifest.webmanifest'), 'w', encoding='utf-8').write(
+        json.dumps(manifest, indent=2) + "\n")
+
+    sw = ("// Service worker for the installed app: caches this one page so it keeps working\n"
+          "// with no network. It never requests anything from another origin, and there is\n"
+          "// nothing else to cache - the page carries its own libraries, fonts and OCR engine.\n"
+          "const CACHE = 'pdf-tool-kit-" + version + "';\n"
+          "const PAGE = './';\n\n"
+          "self.addEventListener('install', e => {\n"
+          "  e.waitUntil(caches.open(CACHE)\n"
+          "    .then(c => c.addAll([PAGE, './manifest.webmanifest', './icon.svg']))\n"
+          "    .then(() => self.skipWaiting()));\n"
+          "});\n"
+          "self.addEventListener('activate', e => {\n"
+          "  e.waitUntil(caches.keys()\n"
+          "    .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))\n"
+          "    .then(() => self.clients.claim()));\n"
+          "});\n"
+          "self.addEventListener('fetch', e => {\n"
+          "  const url = new URL(e.request.url);\n"
+          "  if (url.origin !== self.location.origin) return;   // nothing off this origin, ever\n"
+          "  e.respondWith(caches.match(e.request, { ignoreSearch: true }).then(hit =>\n"
+          "    hit || fetch(e.request).then(res => {\n"
+          "      if (res && res.ok && e.request.method === 'GET') {\n"
+          "        const copy = res.clone();\n"
+          "        caches.open(CACHE).then(c => c.put(e.request, copy));\n"
+          "      }\n"
+          "      return res;\n"
+          "    }).catch(() => caches.match(PAGE))));\n"
+          "});\n")
+    open(os.path.join(out_dir, 'sw.js'), 'w', encoding='utf-8').write(sw)
+
+VERSION = hashlib.sha256(build(True, BRANDS['kit']).encode()).hexdigest()[:12]
+
+# One output: the single strict Content-Security-Policy page, plus the files that make it
+# installable as an app.
+open(os.path.join(OUT, 'index.html'), 'w', encoding='utf-8').write(build(True, BRANDS['kit']))
+pwa_files(OUT, BRANDS['kit'], VERSION)
+
+print('built index.html:', len(build(True, BRANDS['kit']).encode()), 'bytes, plus manifest, icons and service worker')
 for (label,s,k) in variant(['eng','spa'], scripts): print(k, label[:80])

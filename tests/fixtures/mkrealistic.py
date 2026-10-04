@@ -167,3 +167,45 @@ for _n in range(1, 4):
         Resources=Dictionary(Font=Dictionary(F1=_sff), XObject=Dictionary(Fx=_fref)), Contents=_body))))
 _sf.save('fx/shared-footer.pdf')
 print('wrote fx/shared-footer.pdf')
+
+
+# A line drawn with horizontal scaling, so what the file says about its size and how it
+# appears on the page disagree. The tool refuses to rewrite such text, but must still be
+# able to remove it.
+_lt = pikepdf.new()
+_ltf = _lt.make_indirect(Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name.Helvetica,
+                                    Encoding=Name('/WinAnsiEncoding')))
+_ltc = _lt.make_stream(
+    b"BT /F1 12 Tf 1 0 0 1 72 700 Tm (Ordinary line that can be rewritten.) Tj ET\n"
+    b"BT /F1 12 Tf 240 Tz 1 0 0 1 72 660 Tm (Stretched line the tool will not rewrite.) Tj ET\n"
+    b"BT /F1 12 Tf 100 Tz 1 0 0 1 72 620 Tm (Another ordinary line below it.) Tj ET")
+_lt.pages.append(Page(_lt.make_indirect(Dictionary(Type=Name.Page, MediaBox=Array([0,0,612,792]),
+    Resources=Dictionary(Font=Dictionary(F1=_ltf)), Contents=_ltc))))
+_lt.save('fx/locked-text.pdf')
+print('wrote fx/locked-text.pdf')
+
+
+# A page drawn one word at a time, alternating between two identical font resources — how
+# several exporters write — with a table row whose columns sit far apart. The words of a
+# line must join into one block; the table columns must not.
+from reportlab.pdfbase.pdfmetrics import stringWidth
+_wr = pikepdf.new()
+_wa = _wr.make_indirect(Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name.Helvetica, Encoding=Name('/WinAnsiEncoding')))
+_wb = _wr.make_indirect(Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name.Helvetica, Encoding=Name('/WinAnsiEncoding')))
+_ops = []
+def _words(y, text, size=10):
+    x = 72.0
+    for i, w in enumerate(text.split(' ')):
+        res = b'/FA' if i % 2 == 0 else b'/FB'
+        _ops.append(b"BT " + res + (" %d Tf 1 0 0 1 %.2f %.1f Tm (%s) Tj ET" % (size, x, y, w)).encode())
+        x += stringWidth(w, 'Helvetica', size) + stringWidth(' ', 'Helvetica', size)
+for _n, _line in enumerate(["The quick brown fox jumps over the lazy dog near the river",
+                            "and then returns along the bank before the afternoon light",
+                            "fades behind the hills at the far end of the valley"]):
+    _words(700 - _n * 14, _line)
+_ops.append(b"BT /FA 10 Tf 1 0 0 1 72 640 Tm (Widget assembly left side doubled) Tj ET")
+_ops.append(b"BT /FA 10 Tf 1 0 0 1 430 640 Tm (16) Tj ET")
+_wr.pages.append(Page(_wr.make_indirect(Dictionary(Type=Name.Page, MediaBox=Array([0,0,612,792]),
+    Resources=Dictionary(Font=Dictionary(FA=_wa, FB=_wb)), Contents=_wr.make_stream(b"\n".join(_ops))))))
+_wr.save('fx/word-runs.pdf')
+print('wrote fx/word-runs.pdf')

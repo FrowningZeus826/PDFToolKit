@@ -1190,7 +1190,20 @@
   const { PDFTextField, PDFCheckBox, PDFRadioGroup, PDFDropdown, PDFOptionList, StandardFonts, rgb, BlendMode, LineCapStyle, PDFName } = PDFLib;
   const TPAD = 2, LINE = 1.2;
   const BASELINE = (LINE - 1.117) / 2 + 0.905; // baseline offset within a line box, in ems
+  // How willingly pieces of text are joined. Tight keeps columns and labels apart on a
+  // dense layout; loose pulls a paragraph together on a document that scatters its text.
+  // Normal is what the measurements supported: word gaps run to about 0.3 em, the gap to
+  // the next table column starts around 1.7 em.
+  const GROUPING = [
+    { name: "Tight",  join: 0.45, lead: 0.55, overlap: 0.70 },
+    { name: "Normal", join: 0.80, lead: 0.75, overlap: 0.55 },
+    { name: "Loose",  join: 1.30, lead: 1.10, overlap: 0.35 },
+    { name: "Loosest", join: 1.60, lead: 1.60, overlap: 0.20 }
+  ];
+  function grouping(){ return GROUPING[ed.grouping != null ? ed.grouping : 1] || GROUPING[1]; }
   const INKS = { "#141414": "Black", "#1B3A8C": "Blue", "#B3261E": "Red" };
+  // the same inks as PDF colour values, for text written as operators
+  const INKS_RGB = { "#141414": [0.078, 0.078, 0.078], "#1B3A8C": [0.106, 0.227, 0.549], "#B3261E": [0.702, 0.149, 0.118] };
   const eStage = $("estage"), eCanvas = $("estage-canvas"), eLayer = $("eolayer");
   const editStatus = $("edit-status"), editGo = $("edit-go");
 
@@ -1198,7 +1211,8 @@
     info: null, view: null, pageCount: 0, page: 0, mode: "annotate", tool: null,
     objs: [], seq: 0, sel: null, dims: {}, scale: 1,
     fields: [], fsel: -1, renderToken: 0, loadToken: 0, renderTask: null, needsRender: false, busy: false,
-    runs: [], blocks: [], tsel: null, textEdits: new Map(), vp: null, redactions: [],
+    runs: [], blocks: [], tsel: null, typing: null, textEdits: new Map(), vp: null, redactions: [], grouping: null,
+    lockedSel: null, lockedAlso: [], showAll: null,
     pendingImage: null
   };
   const helvReady = (async () => { const d = await PDFDocument.create(); return d.embedFont(StandardFonts.Helvetica); })();
@@ -1598,13 +1612,40 @@
         layoutText(o); clampObj(o); layoutText(o);
         drawLayer();
       });
+      const fontRow = document.createElement("div"); fontRow.className = "proprow";
+      const fl = document.createElement("span"); fl.className = "muted"; fl.textContent = "Font";
+      const fsel = document.createElement("select"); fsel.id = "ep-font"; fsel.setAttribute("aria-label", "Font");
+      const fillFonts = () => {
+        fsel.innerHTML = "";
+        const docOnes = [];
+        (ed.docFonts || new Map()).forEach((info, key) => {
+          if (info && info.usable) docOnes.push([key, info.baseFont || key.split("|")[0]]);
+        });
+        docOnes.sort((a, b) => a[1].localeCompare(b[1]));
+        docOnes.forEach(([key, label]) => fsel.appendChild(new Option("From this PDF: " + label, "doc:" + key)));
+        TEXT_FONTS.forEach(([label, v]) => fsel.appendChild(new Option(label, v)));
+        fsel.value = o.fontKey || StandardFonts.Helvetica;
+        if (!fsel.value) fsel.value = StandardFonts.Helvetica;
+      };
+      fillFonts();
+      // the page's fonts take a moment to read, so fill them in once they are known
+      ensureDocFonts().then(() => { if ($("ep-font") === fsel) fillFonts(); });
+      fsel.addEventListener("change", () => {
+        o.fontKey = fsel.value;
+        o.docFont = fsel.value.indexOf("doc:") === 0 ? (ed.docFonts.get(fsel.value.slice(4)) || null) : null;
+        o.fontRes = o.docFont ? fsel.value.slice(4).split("|")[0] : null;
+        o.fontStream = o.docFont ? (fsel.value.slice(4).split("|")[1] || null) : null;
+        layoutText(o); clampObj(o); layoutText(o); drawLayer();
+      });
+      fontRow.appendChild(fl); fontRow.appendChild(fsel);
+
       const size = document.createElement("div"); size.className = "proprow";
       const sl = document.createElement("span"); sl.className = "muted"; sl.textContent = "Size";
       const r = document.createElement("input"); r.type = "range"; r.min = "6"; r.max = "40"; r.value = String(o.size); r.setAttribute("aria-label", "Text size");
       const v = document.createElement("span"); v.className = "muted"; v.textContent = o.size + " pt";
       r.addEventListener("input", () => { o.size = +r.value; v.textContent = o.size + " pt"; layoutText(o); clampObj(o); layoutText(o); drawLayer(); });
       size.append(sl, r, v);
-      box.append(ta, warn, size, colorChips(o));
+      box.append(ta, warn, fontRow, size, colorChips(o));
       warn.hidden = !cleanText(o.raw).bad;
     } else if (o.type === "check" || o.type === "cross" || o.type === "box") {
       box.appendChild(colorChips(o));
@@ -1717,13 +1758,21 @@
     $("sig-tool").classList.toggle("active", !!sigArmed);
     $("annot-tools").hidden = !annot;
     // the properties column only takes space when there is something to show
-    const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" || ed.mode === "text" || ed.mode === "redact" || ($("f-flatten").checked && ed.fields.length);
+    // The panel exists only when it has something to say, so an unselected page is just
+    // the page.
+    // Text editing happens on the page and in the ribbon, so the side panel only opens for
+    // the one case that needs it: removing text that cannot be rewritten.
+    const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
+    const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" ||
+                       textPanelNeeded || ed.mode === "redact" || ($("f-flatten").checked && ed.fields.length);
     const wa = $("workarea"), had = wa.classList.contains("has-props");
     wa.classList.toggle("has-props", !!needsProps);
     // the page column changes width when that column appears, so re-fit the page
     if (had !== !!needsProps && ed.view) requestAnimationFrame(() => editRender());
     $("edit-docopts").hidden = ed.mode !== "doc";
     $("edit-textpanel").hidden = ed.mode !== "text";
+    const rib = $("tx-ribbon");
+    if (rib) { rib.hidden = ed.mode !== "text" || !ed.view; renderRibbon(); }
     $("edit-redactpanel").hidden = ed.mode !== "redact";
     $("edit-hint").hidden = !annot;
     $("edit-hint").textContent = ed.tool ? TOOL_HINTS[ed.tool] : (ed.sel !== null ? "Drag to move. Drag the gold corner to resize." : "Pick a tool, then tap the page. Tap anything you've added to move, resize, or change it.");
@@ -1764,7 +1813,8 @@
     const b = ed.blocks[i];
     const cur = ed.textEdits.get(i) || { page: ed.page, stream: b.stream || null, ops: b.ops, text: b.text, fontName: StandardFonts.Helvetica,
       size: b.size, fill: b.fill, x: b.x, top: b.top, width: b.w, height: b.height, leading: b.leading,
-      lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0 };
+      lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0,
+      box: { x: b.x, y: b.minY, w: b.w, h: (b.maxY - b.minY) + b.h } };
     ed.textEdits.set(i, Object.assign(cur, patch));
     return cur;
   }
@@ -1800,7 +1850,31 @@
     ev.preventDefault();
   }
 
+  // Double-click, or the button in the panel, puts a caret on the page.
+  function beginOnPageEdit(i){
+    ed.tsel = i;
+    ed.typing = i;
+    if (!ed.textEdits.get(i)) blockEdit(i, {});       // stage it so the preview exists
+    drawLayer(); editUi();
+    const first = eLayer.querySelector('.tprev[data-line="0"]');
+    if (first) {
+      first.focus();
+      const r = document.createRange(), sel = window.getSelection();
+      r.selectNodeContents(first); r.collapse(false);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+  }
+
   function startBlockDrag(ev, i, el){
+    // One press selects or drags; two put a caret in the text. The browser's own count
+    // can't be used: selecting rebuilds the overlay, so the second press lands on a new
+    // element and the count starts again. Track it here instead.
+    const now = Date.now();
+    const quickSecond = ed.lastPress && ed.lastPress.i === i && now - ed.lastPress.t < 500;
+    ed.lastPress = { i: i, t: now };
+    if (quickSecond && !ed.mergeArmed && !ed.splitArmed) {
+      ev.preventDefault(); beginOnPageEdit(i); return;
+    }
     if (ev.button > 0) return;
     if (ed.tsel !== null && i !== ed.tsel && (ed.mergeArmed || ev.shiftKey)) { mergeBlocks(ed.tsel, i); return; }
     if (ed.mergeArmed && i === ed.tsel) { ed.mergeArmed = false; setStatus(editStatus, "info", "Merge cancelled."); }
@@ -1827,6 +1901,29 @@
     ev.preventDefault();
   }
 
+  // Load what the page's own fonts can do. Used by the text editor, and by a new text box
+  // that wants to match the document rather than approximate it.
+  async function ensureDocFonts(){
+    if (ed.docFonts && ed.docFonts.size) return;
+    ed.docFonts = new Map(); ed.docSiblings = new Map();
+    docFontCache.clear();
+    try {
+      const d = await loadPdf(ed.info.bytes.slice(0), ed.info.file.name);
+      const ops = await allPageOps(d, ed.page);
+      const seen = new Map();
+      ops.forEach(o => { if (o.font) seen.set(o.font + "|" + (o.stream || ""), o); });
+      seen.forEach(o => {
+        const sd = o.stream && ops.streams.get(o.stream) ? ops.streams.get(o.stream).dict : null;
+        const info = documentFont(d, ed.page, o.font, sd);
+        ed.docFonts.set(o.font + "|" + (o.stream || ""), info);
+        if (info && info.usable) ["bold", "italic", "bolditalic", "regular"].forEach(want => {
+          const sib = siblingFont(d, ed.page, info, want, sd);
+          if (sib) ed.docSiblings.set(o.font + "|" + (o.stream || "") + ":" + want, sib);
+        });
+      });
+    } catch (err) { /* the bundled fonts still work */ }
+  }
+
   async function enterTextMode(){
     if (!ed.view || ed.runs.length) { drawLayer(); editUi(); return; }
     setStatus(editStatus, "info", "Looking at the text on this page\u2026");
@@ -1849,8 +1946,10 @@
         });
       } catch (err) { /* fall back to the bundled fonts */ }
       const n = ed.blocks.length;
+      const perLine = ed.runs.length ? (n / Math.max(1, new Set(ed.runs.map(r => Math.round(r.y))).size)) : 0;
       setStatus(editStatus, n ? "info" : "error",
-        n ? "Tap a highlighted block to edit its text, or drag it to move it. " + plural(n, "block") + " on this page."
+        n ? "Tap a highlighted block to edit its text, or drag it to move it. " + plural(n, "block") +
+            " on this page" + (perLine > 1.6 ? " \u2014 that looks like more than one box per line; try moving Grouping towards Loose." : ".")
           : "None of the text on this page can be edited directly. It may be a scan, or drawn inside a reusable block.");
     } catch (err) {
       setStatus(editStatus, "error", "Couldn't read the text on this page: " + (err.message || err));
@@ -1858,9 +1957,93 @@
     drawLayer(); editUi();
   }
 
+  // Text we cannot rewrite can still be removed: removal only needs to know which
+  // operators draw it. The catch is that one operator may draw more than the line pointed
+  // at, so the full extent is shown before anything is deleted.
+  function selectLocked(run){
+    ed.tsel = null;
+    ed.lockedSel = run;
+    const share = (ed.runs || []).filter(o => o !== run && o.spans && run.spans &&
+      o.spans.some(s1 => run.spans.some(s2 => s1.opStart === s2.opStart)));
+    ed.lockedAlso = share;
+    drawLayer(); editUi();
+    setStatus(editStatus, "info", (LOCK_REASON[run.reason] || LOCK_REASON.unpositioned) +
+      " Press Delete, or use Remove in the panel, to take it off the page.");
+  }
+  function deleteLocked(){
+    const run = ed.lockedSel;
+    if (!run) return;
+    const spans = run.spans && run.spans.length ? run.spans : [{ opStart: run.opStart, opEnd: run.opEnd }];
+    if (!spans.length || spans[0].opStart == null) { setStatus(editStatus, "error", "This text can't be removed either: it isn't drawn as text on this page."); return; }
+    const key = "locked:" + spans[0].opStart;
+    ed.textEdits.set(key, { page: ed.page, stream: run.stream || null, ops: spans, text: "",
+      fontName: "doc", docFontRes: run.fontRes, size: run.size, fill: run.fill,
+      x: run.x, top: run.y + run.h, width: run.w, leading: run.size * LINE,
+      lineBoxes: [{ x: run.x, y: run.y, w: run.w }], moved: false, dx: 0, dy: 0 });
+    const extra = (ed.lockedAlso || []).length;
+    ed.lockedSel = null; ed.lockedAlso = [];
+    drawLayer(); editUi(); editSummary();
+    setStatus(editStatus, "success", "Marked for removal." + (extra ? " " + plural(extra, "other line") + " drawn by the same instruction will go with it." : ""));
+  }
+
+  // The font and size controls live on the ribbon above the page, where they stay put
+  // instead of appearing and disappearing with a side panel.
+  function renderRibbon(){
+    const sel = $("rb-font"), size = $("rb-size"), note = $("rb-note");
+    if (!sel) return;
+    const b = ed.tsel !== null && ed.blocks ? ed.blocks[ed.tsel] : null;
+    sel.disabled = size.disabled = !b;
+    if (!b) { note.textContent = "Select some text to change its font or size."; return; }
+    const e = ed.textEdits.get(ed.tsel) || {};
+    const want = e.fontName || fontDefaultFor(b);
+    const built = sel.dataset.forBlock === String(ed.tsel);
+    if (!built) {
+      sel.innerHTML = "";
+      const dinfo = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+      if (dinfo && dinfo.usable) sel.appendChild(new Option("Match the document", "doc"));
+      [["doc:bold", "Document bold"], ["doc:italic", "Document italic"],
+       ["doc:bolditalic", "Document bold italic"], ["doc:regular", "Document regular"]]
+        .forEach(([v, label]) => { if (ed.docSiblings && ed.docSiblings.get(b.fontRes + "|" + (b.stream || "") + ":" + v.slice(4))) sel.appendChild(new Option(label, v)); });
+      TEXT_FONTS.forEach(([label, v]) => sel.appendChild(new Option(label, v)));
+      sel.dataset.forBlock = String(ed.tsel);
+    }
+    sel.value = want;
+    if (document.activeElement !== size) size.value = String(Math.round((e.size || b.size) * 10) / 10);
+    const e2 = ed.textEdits.get(ed.tsel) || {};
+    const lines = (e2.text != null ? e2.text : b.text).split("\n").length;
+    const grew = lines > (b.runs ? b.runs.length : lines);
+    const bits = [];
+    if (b.stream) {
+      const pages = ed.formPages ? (ed.formPages.get(b.stream) || 1) : 1;
+      bits.push(pages > 1
+        ? "Shared block: editing this changes all " + pages + " pages that use it."
+        : "From a reusable block; the change stays on this page.");
+    }
+    if (b.mixedFont) bits.push("This text mixes fonts; the first is used.");
+    if (grew) bits.push("Now " + lines + " lines instead of " + b.runs.length + ", so it will run down over what sits below.");
+    note.textContent = bits.join(" ");
+    note.className = "ribbon-note" + (grew || (b.stream && ed.formPages && (ed.formPages.get(b.stream) || 1) > 1) ? " warn" : "");
+  }
+  function fontDefaultFor(b){
+    const dinfo = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+    return dinfo && dinfo.usable ? "doc" : StandardFonts.Helvetica;
+  }
+  { const sel = $("rb-font"), size = $("rb-size");
+    if (sel) sel.addEventListener("change", () => { if (ed.tsel !== null) { blockEdit(ed.tsel, { fontName: sel.value }); drawLayer(); editUi(); } });
+    if (size) size.addEventListener("input", () => { if (ed.tsel !== null && +size.value > 0) { blockEdit(ed.tsel, { size: +size.value }); drawLayer(); editUi(); } }); }
+
   function renderTextPanel(){
     const has = ed.tsel !== null && ed.blocks && ed.blocks[ed.tsel];
-    $("tx-empty").hidden = !!has;
+    const locked = !has && !!ed.lockedSel;
+    $("tx-locked").hidden = !locked;
+    if (locked) {
+      const n = (ed.lockedAlso || []).length;
+      $("tx-locked-why").textContent = LOCK_REASON[ed.lockedSel.reason] || LOCK_REASON.unpositioned;
+      $("tx-locked-extent").textContent = n
+        ? "Removing it also removes " + plural(n, "other line") + " drawn by the same instruction \u2014 shown outlined on the page."
+        : "Nothing else is drawn by the same instruction, so only this goes.";
+    }
+    $("tx-empty").hidden = !!has || locked;
     $("tx-edit").hidden = !has;
     if (!has) return;
     const b = ed.blocks[ed.tsel], e = ed.textEdits.get(ed.tsel);
@@ -1953,6 +2136,40 @@
     drawLayer(); renderTextPanel(); editSummary();
   }
   $("tx-size").addEventListener("input", stageTextEdit);
+  $("tx-locked-go").addEventListener("click", deleteLocked);
+  $("tx-showall").addEventListener("click", () => setShowAll(!showAllBlocks()));
+  function setGrouping(level, redo){
+    ed.grouping = Math.max(0, Math.min(GROUPING.length - 1, level | 0));
+    try { localStorage.setItem("pdf-tools:grouping", String(ed.grouping)); } catch (e) {}
+    const sl = $("tx-group"), lb = $("tx-group-name");
+    if (sl) sl.value = String(ed.grouping);
+    if (lb) lb.textContent = grouping().name;
+    if (redo && ed.view && ed.mode === "text") {
+      ed.runs = []; ed.blocks = []; ed.tsel = null; ed.lockedSel = null; ed.lockedAlso = [];
+      ed.textEdits = new Map();
+      enterTextMode();
+    }
+  }
+  { const sl = $("tx-group");
+    if (sl) sl.addEventListener("input", () => setGrouping(+sl.value, true));
+    try { const v = localStorage.getItem("pdf-tools:grouping"); if (v !== null) ed.grouping = +v; } catch (e) {}
+    setGrouping(ed.grouping != null ? ed.grouping : 1, false); }
+  (function restoreShowAll(){
+    try { const v = localStorage.getItem("pdf-tools:show-blocks"); if (v !== null) ed.showAll = v === "1"; } catch (e) {}
+    const btn = $("tx-showall");
+    if (btn) { const on = showAllBlocks(); btn.setAttribute("aria-pressed", on ? "true" : "false"); btn.classList.toggle("armed", on); }
+  })();
+  document.addEventListener("keydown", e => {
+    if (activeTool !== "document" || ed.mode !== "text") return;
+    if (e.key === "Enter" && ed.tsel !== null && ed.typing === null &&
+        !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) {
+      e.preventDefault(); beginOnPageEdit(ed.tsel); return;
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && ed.lockedSel &&
+        !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) {
+      e.preventDefault(); deleteLocked();
+    }
+  });
   $("tx-text").addEventListener("input", stageTextEdit);
   $("tx-font").addEventListener("change", stageTextEdit);
   $("tx-revert").addEventListener("click", () => { ed.textEdits.delete(ed.tsel); $("tx-text").value = ed.blocks[ed.tsel].text; drawLayer(); renderTextPanel(); editSummary(); });
@@ -2017,7 +2234,7 @@
     if (next < 0 || next >= ed.pageCount) return;
     ed.page = next; ed.sel = null; ed.tsel = null;
     await editRender();
-    if (ed.mode === "text") { ed.runs = []; ed.blocks = []; ed.tsel = null; await enterTextMode(); }
+    if (ed.mode === "text") { ed.runs = []; ed.blocks = []; ed.tsel = null; ed.lockedSel = null; ed.lockedAlso = []; await enterTextMode(); }
   };
   $("e-prev").addEventListener("click", () => turnPage(-1));
   $("e-next").addEventListener("click", () => turnPage(1));
@@ -2118,7 +2335,7 @@
       // would stamp a second watermark or another set of page numbers on top.
       $("pn-start").value = "1";
       ed.runs = []; ed.blocks = []; ed.tsel = null; ed.textEdits = new Map(); ed.mergeArmed = false; ed.splitArmed = false;
-      ed.redactions = [];
+      ed.redactions = []; ed.lockedSel = null; ed.lockedAlso = [];
       $("wm-on").checked = false; $("wm-text").value = "";
       $("pn-on").checked = false; $("pn-skip1").checked = false;
       ed.fields = await readFields(info);
@@ -2137,6 +2354,37 @@
     onShow: async () => { if (ed.needsRender) await editRender(); }
   };
   wireSingle("edit", tools.document);
+
+  // ---------- Installed-app extras ----------
+  // Only present in the hosted build. When the operating system opens a PDF with this app,
+  // Chrome hands the file over here; it then takes exactly the same path as the picker.
+  async function openLaunchedFile(file){
+    try {
+      work.steps = []; work.undo = [];
+      const info = await prepare(file);
+      setCurrent(info);
+      await syncTool(activeTool);
+      setStatus(editStatus, "info", "Opened " + file.name + " from your computer.");
+      return true;
+    } catch (err) {
+      setStatus(editStatus, "error", err.message || "Couldn't open that file.");
+      return false;
+    }
+  }
+  window.__openLaunchedFile = openLaunchedFile;   // the suites exercise this path
+  if (window.launchQueue && window.launchQueue.setConsumer) {
+    window.launchQueue.setConsumer(async launch => {
+      if (!launch || !launch.files || !launch.files.length) return;
+      await openLaunchedFile(await launch.files[0].getFile());
+    });
+  }
+  // A service worker keeps the installed app working with no network. It caches this one
+  // page and nothing else; it never fetches anything from anywhere else.
+  if (window.__PDFKIT_PWA && "serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
   // second picker inside the workspace ("Open another")
   $("edit-input2").addEventListener("change", async () => {
     const f = $("edit-input2").files[0];
@@ -2270,10 +2518,13 @@
     }
     return out;
   }
-  async function applyTextEdits(doc, edits){
+  async function applyTextEdits(doc, edits, rawDraw, rawPage){
     // edits: [{ page, stream, ops:[{opStart,opEnd}], text, fontName, size, fill, x, top, width, leading }]
+    // rawDraw is operator text to append to rawPage — needed on its own when there is
+    // nothing to delete, such as a redaction over blank space or a new text box.
     const byPage = new Map();
     edits.forEach(e => { if (!byPage.has(e.page)) byPage.set(e.page, []); byPage.get(e.page).push(e); });
+    if (rawDraw && rawPage != null && !byPage.has(rawPage)) byPage.set(rawPage, []);
     docFontCache.clear();
     for (const [pageIndex, all] of byPage) {
       const streams = await allPageOps(doc, pageIndex);
@@ -2289,18 +2540,20 @@
         }, st.dict);
       }
       const list = all.filter(e => !e.stream);
-      if (!list.length) continue;
+      // raw drawing belongs to one page only
+      const drawHere = (rawDraw && (rawPage == null || rawPage === pageIndex)) ? rawDraw : "";
+      if (!list.length && !drawHere) continue;
       const { page, text } = await pageContent(doc, pageIndex);
       await rewriteStream(doc, pageIndex, text, null, list, out => {
         const stream = doc.context.flateStream(enc8(out));
         page.node.set(N("Contents"), doc.context.register(stream));
-      }, null);
+      }, null, drawHere);
     }
   }
 
   // Remove the operators an edit replaces and append the new text, in whichever stream the
   // text lives in, drawn under the inverse of the transform in force where it is appended.
-  async function rewriteStream(doc, pageIndex, text, knownEndCtm, list, commit, resDict){
+  async function rewriteStream(doc, pageIndex, text, knownEndCtm, list, commit, resDict, rawDraw){
     {
       const page = doc.getPages()[pageIndex];
       const endCtm = knownEndCtm || parseContentOps(text).endCtm || [1, 0, 0, 1, 0, 0];
@@ -2313,10 +2566,27 @@
       let out = text;
       const cuts = [];
       list.forEach(e => (e.ops || []).forEach(o => cuts.push(o)));
+      // Matching reported lines to operators can miss pieces — a word drawn in two halves,
+      // a stray repositioned fragment — and a missed piece shows through the replacement.
+      // So anything standing inside the area being rewritten goes too.
+      const boxes = list.map(e => e.box).filter(Boolean);
+      if (boxes.length) {
+        try {
+          const all = await allPageOps(doc, pageIndex);
+          all.forEach(o => {
+            if (!o.located || !o.matrix || o.stream) return;
+            const size = Math.hypot(o.matrix[0], o.matrix[1]) || 10;
+            const px = o.matrix[4], py = o.matrix[5];
+            const inside = boxes.some(q => px >= q.x - size * 0.5 && px <= q.x + q.w + size * 0.5 &&
+                                           py >= q.y - size * 0.5 && py <= q.y + q.h + size * 0.5);
+            if (inside) cuts.push({ opStart: o.start, opEnd: o.end });
+          });
+        } catch (err) { /* the matched operators still go */ }
+      }
       cuts.sort((a, b) => b.opStart - a.opStart).forEach(o => {
         out = out.slice(0, o.opStart) + " ".repeat(o.opEnd - o.opStart) + out.slice(o.opEnd);
       });
-      let add = "";
+      let add = rawDraw || "";
       for (const e of list) {
         // Prefer the document's own font: the resource is already on the page, and the
         // text is written in that font's character codes. If it lacks a character the
@@ -2749,7 +3019,47 @@
         size: shown || parsed || 11
       });
     });
-    return runs;
+    return joinRuns(runs);
+  }
+
+  // Many writers draw a line one word at a time, so what the reader reports as separate
+  // pieces is really one line. Join neighbours that share a baseline and sit a space apart:
+  // measured on real documents, word gaps run to about 0.3 em while the gap to the next
+  // table column starts around 1.7 em, so 0.8 em separates them with room to spare.
+  function joinRuns(runs){
+    const out = [];
+    // Readers do not always report a line left to right, so order the pieces along the
+    // baseline first; otherwise neighbouring words never meet and stay separate boxes.
+    const ordered = runs.slice().sort((a, b) => (b.y - a.y) || (a.x - b.x));
+    ordered.forEach(r => {
+      // glyphs that produce no character (icon placeholders and the like) are not text
+      if (!r.str || !r.str.replace(/[\u0000-\u001f\ufffd]/g, "").trim()) return;
+      const prev = out[out.length - 1];
+      const size = r.size || 10;
+      // Deliberately not requiring the same font resource: writers alternate between
+      // identical subsets word by word (this document uses two for one sentence), and
+      // refusing to join across them is what left a box per word. What must match is how
+      // the text looks and where it sits — same size, same colour, same baseline.
+      const sameInk = !prev || !prev.fill || !r.fill ||
+        (Math.abs(prev.fill[0] - r.fill[0]) < 0.02 && Math.abs(prev.fill[1] - r.fill[1]) < 0.02 &&
+         Math.abs(prev.fill[2] - r.fill[2]) < 0.02);
+      if (prev && prev.editable === r.editable && prev.stream === r.stream && sameInk &&
+          Math.abs(prev.size - r.size) < 0.6 &&
+          Math.abs(prev.y - r.y) < Math.max(0.5, size * 0.12)) {
+        const gap = (r.x - (prev.x + prev.w)) / size;
+        if (gap <= grouping().join && gap > -1.5) {
+          // a real space between the pieces, or none where the writer split mid-word
+          prev.str += (gap >= 0.12 && !/\s$/.test(prev.str) && !/^\s/.test(r.str) ? " " : "") + r.str;
+          prev.w = (r.x + r.w) - prev.x;
+          prev.spans = (prev.spans || []).concat(r.spans || []);
+          prev.h = Math.max(prev.h, r.h);
+          if (prev.fontRes !== r.fontRes) prev.mixedFont = true;
+          return;
+        }
+      }
+      out.push(Object.assign({}, r, { spans: (r.spans || []).slice() }));
+    });
+    return out;
   }
 
   // Lines that follow each other down the page at a consistent leading, in the same size,
@@ -2765,11 +3075,12 @@
         // Paragraph lines sit almost on top of each other (leading ≈ 1.2 × size, so a gap of
         // roughly a fifth of the size). Table rows are spaced much further apart, and must
         // stay separate blocks or editing a cell would reflow the column.
-        if (gap < -r.h * 0.5 || gap > b.size * 0.75) return false;
+        if (gap < -r.h * 0.5 || gap > b.size * grouping().lead) return false;
         if (b.leadingSeen && Math.abs((b.minY - r.y) - b.leadingSeen) > b.size * 0.35) return false;
         const overlap = Math.min(b.x + b.w, r.x + r.w) - Math.max(b.x, r.x);
         const sharesLeft = Math.abs(b.x - r.x) < Math.max(2, b.size * 0.3);
-        return overlap > Math.min(b.w, r.w) * 0.55 && (sharesLeft || overlap > Math.min(b.w, r.w) * 0.85);
+        return overlap > Math.min(b.w, r.w) * grouping().overlap &&
+               (sharesLeft || overlap > Math.min(b.w, r.w) * Math.min(0.95, grouping().overlap + 0.3));
       });
       if (fit) {
         fit.leadingSeen = fit.minY - r.y;
@@ -2875,6 +3186,68 @@
       return "rgb(" + p[0] + "," + p[1] + "," + p[2] + ")";
     } catch (err) { return "#fff"; }
   }
+  // What is on the page is the truth while someone is typing there.
+  function onPageEdit(i){
+    const els = [...eLayer.querySelectorAll(".tprev[data-line]")]
+      .sort((a, b2) => (+a.dataset.line) - (+b2.dataset.line));
+    const lines = els.map(el => el.textContent.replace(/\u00a0/g, " "));
+    if (!lines.length) return;
+    const b = ed.blocks[i];
+    // If a line has grown past the block's width, re-wrap the whole paragraph so the text
+    // stays inside the box instead of running off the side. Where the caret is matters, so
+    // it is put back at the same point in the text afterwards.
+    const e0 = ed.textEdits.get(i) || {};
+    const width = e0.width || b.w;
+    const size = e0.size || b.size;
+    const info = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+    const measure = (t, sz) => info && info.usable ? widthWithDocFont(info, t, sz) : t.length * sz * 0.5;
+    const overflowing = lines.length > 1 && lines.some(l => measure(l, size) > width * 1.02);
+    let text = lines.join("\n");
+    if (overflowing) {
+      const caret = caretOffsetIn(els);
+      text = wrapToWidth({ widthOfTextAtSize: measure }, lines.join(" ").replace(/\s+/g, " ").trim(), size, width).join("\n");
+      blockEdit(i, { text: text });
+      drawLayer();
+      restoreCaret(i, caret);
+      editSummary(); editUi();
+      return;
+    }
+    blockEdit(i, { text: text });
+    const ta = $("tx-text");
+    if (ta && document.activeElement !== ta) ta.value = lines.join("\n");
+    editSummary(); editUi();
+  }
+
+  // Where the caret sits, counted in characters from the start of the block.
+  function caretOffsetIn(els){
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    const node = sel.anchorNode, off = sel.anchorOffset;
+    let total = 0;
+    for (const el of els) {
+      if (el === node || el.contains(node)) return total + off;
+      total += el.textContent.length + 1;              // the newline between lines
+    }
+    return null;
+  }
+  function restoreCaret(i, offset){
+    if (offset == null) return;
+    const els = [...eLayer.querySelectorAll(".tprev[data-line]")]
+      .sort((a, b2) => (+a.dataset.line) - (+b2.dataset.line));
+    let left = offset;
+    for (const el of els) {
+      const len = el.textContent.length;
+      if (left <= len) {
+        const node = el.firstChild || el;
+        const r = document.createRange(), sel = window.getSelection();
+        try { r.setStart(node, Math.min(left, node.length != null ? node.length : 0)); } catch (err) { return; }
+        r.collapse(true); sel.removeAllRanges(); sel.addRange(r); el.focus();
+        return;
+      }
+      left -= len + 1;
+    }
+  }
+
   function previewBlock(i, b, e){
     const vp = ed.vp, s = ed.scale;
     const x = e.moved ? e.x : b.x, top = e.moved ? e.top : b.top;
@@ -2914,11 +3287,24 @@
       const leading = b.leading > size * 0.8 ? b.leading : size * LINE;
       lines.forEach((ln, k) => places.push({ text: ln, x, y: top - size - k * leading }));
     }
-    places.forEach(pl => {
+    places.forEach((pl, li) => {
       const p = vp.convertToViewportPoint(pl.x, pl.y);
       const el = document.createElement("div");
       el.className = "tprev";
       el.textContent = pl.text;
+      if (ed.tsel === i && ed.typing === i && !ed.mergeArmed && !ed.splitArmed) {
+        // typing happens here, over the page, with the panel as the fallback for anything
+        // awkward: long paragraphs, phones, screen readers
+        el.contentEditable = "true";
+        el.spellcheck = false;
+        el.dataset.line = li;
+        el.addEventListener("input", () => onPageEdit(i));
+        el.addEventListener("keydown", ev => {
+          if (ev.key === "Escape") { ev.preventDefault(); ed.typing = null; el.blur(); drawLayer(); editUi(); }
+          ev.stopPropagation();          // Delete belongs to the text, not the block
+        });
+        el.addEventListener("pointerdown", ev => ev.stopPropagation());
+      }
       el.style.left = p[0] + "px";
       el.style.top = p[1] + "px";
       el.style.fontSize = (size * s) + "px";
@@ -2935,12 +3321,30 @@
     size: "What the file says about this text's size doesn't match how it appears on the page, so redrawing it would very likely come out wrong."
   };
 
+  // Whether every editable block is outlined, or only the one under the pointer. Devices
+  // without a pointer have no hover, so they start with everything shown.
+  function showAllBlocks(){
+    if (ed.showAll !== null && ed.showAll !== undefined) return ed.showAll;
+    return !window.matchMedia || !window.matchMedia("(pointer: fine)").matches;
+  }
+  function setShowAll(on){
+    ed.showAll = on;
+    try { localStorage.setItem("pdf-tools:show-blocks", on ? "1" : "0"); } catch (e) {}
+    const btn = $("tx-showall");
+    if (btn) { btn.setAttribute("aria-pressed", on ? "true" : "false"); btn.classList.toggle("armed", on); }
+    drawLayer();
+  }
+
   function drawTextOverlays(){
     const vp = ed.vp;
     if (!vp) return;
+    const all = showAllBlocks();
     (ed.blocks || []).forEach((b, i) => {
       const e = ed.textEdits.get(i);
       if (e) previewBlock(i, b, e);
+      else if (ed.tsel === i) previewBlock(i, b, {
+        text: b.text, size: b.size, fill: b.fill, x: b.x, top: b.top,
+        width: b.w, leading: b.leading, lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0 });
       const x = e && e.moved ? e.x : b.x, top = e && e.moved ? e.top : b.top;
       const w = e && e.width ? e.width : b.w;
       const p1 = vp.convertToViewportPoint(x, top);
@@ -2951,7 +3355,8 @@
       const el = document.createElement("div");
       const shared = b.stream && ed.formPages && (ed.formPages.get(b.stream) || 1) > 1;
       el.className = "trun block" + (e ? " changed" : "") + (ed.tsel === i ? " sel" : "") +
-        (ed.mergeArmed && ed.tsel !== i ? " mergeable" : "") + (b.stream ? " fromblock" : "") + (shared ? " shared" : "");
+        (ed.mergeArmed && ed.tsel !== i ? " mergeable" : "") + (b.stream ? " fromblock" : "") + (shared ? " shared" : "") +
+        (all || e || ed.tsel === i || ed.mergeArmed ? "" : " quiet");
       el.style.left = Math.min(p1[0], p2[0]) - 2 + "px";
       el.style.top = Math.min(p1[1], p2[1]) - 2 + "px";
       el.style.width = (Math.abs(p2[0] - p1[0]) + 4) + "px";
@@ -2960,6 +3365,7 @@
         (b.stream ? (shared ? " \u00b7 from a block reused on " + ed.formPages.get(b.stream) + " pages: editing changes all of them"
                             : " \u00b7 from a reusable block, used only on this page") : "");
       el.addEventListener("pointerdown", ev => startBlockDrag(ev, i, el));
+      el.addEventListener("dblclick", ev => { ev.stopPropagation(); beginOnPageEdit(i); });
       eLayer.appendChild(el);
       if (ed.tsel === i && ed.splitArmed && b.runs.length > 1) {
         for (let k = 1; k < b.runs.length; k++) {
@@ -2999,8 +3405,10 @@
       el.className = "trun locked";
       el.style.left = Math.min(p1[0], p2[0]) + "px"; el.style.top = Math.min(p1[1], p2[1]) - 2 + "px";
       el.style.width = Math.abs(p2[0] - p1[0]) + "px"; el.style.height = (Math.abs(p2[1] - p1[1]) + 4) + "px";
-      el.title = LOCK_REASON[r.reason] || LOCK_REASON.unpositioned;
-      el.addEventListener("click", () => setStatus(editStatus, "info", el.title));
+      const picked = ed.lockedSel === r, along = (ed.lockedAlso || []).indexOf(r) >= 0;
+      el.className += (picked ? " sel" : along ? " alongside" : all ? "" : " quiet");
+      el.title = (LOCK_REASON[r.reason] || LOCK_REASON.unpositioned) + " It can still be removed.";
+      el.addEventListener("click", () => selectLocked(r));
       eLayer.appendChild(el);
     });
   }
@@ -3125,32 +3533,114 @@
         const box = { x: r.x, y: r.y, w: r.w, h: r.h };
         const hit = rects.filter(q => boxesOverlap(q, box));
         if (!hit.length) return;
-        // Which characters survive? Estimate each character's span across the line, and
-        // keep only those wholly outside every rectangle.
-        const chars = [...r.str];
-        const per = r.w / Math.max(1, chars.length);
-        const kept = chars.map((ch, i) => {
-          const cx = r.x + i * per, cw = per;
-          const inside = hit.some(q => cx + cw * 0.5 >= q.x && cx + cw * 0.5 <= q.x + q.w);
-          return inside ? "" : ch;
-        }).join("");
+        // Anything the box touches goes, in full. Trimming inside a run looked tidier but
+        // is unsafe: a single word is often drawn as several runs, so partial trimming left
+        // fragments like "proces" behind. Half a redacted word is still a disclosure, so the
+        // rule is the blunt one — if the box touches this piece of text, the whole piece is
+        // removed. Size the box to what should go.
         edits.push({
           page: pageIndex, stream: r.stream || null, ops: r.spans && r.spans.length ? r.spans : [{ opStart: r.opStart, opEnd: r.opEnd }],
-          text: kept.trim() ? kept : "", fontName: "doc", docFontRes: r.fontRes,
+          text: "", fontName: "doc", docFontRes: r.fontRes,
           size: r.size, fill: r.fill, x: r.x, top: r.y + r.h, width: r.w, leading: r.size * LINE,
           lineBoxes: [{ x: r.x, y: r.y, w: r.w }], moved: false, dx: 0, dy: 0
         });
       });
-      if (edits.length) await applyTextEdits(doc, edits);
-      // and now the marker, drawn over the area the text used to occupy
-      const page = doc.getPages()[pageIndex];
+      // The marker is written as operators in the same rewrite as the text removal. Using
+      // the library's own drawing helper here would restructure the page's contents into a
+      // form the parser can no longer read, and doing it afterwards fails for the mirror
+      // image of that reason. One mechanism, one predictable order: box first, then
+      // whatever survived of a partly covered line, drawn over it.
       const mark = $("rd-mark").value;
+      let draw = "";
       if (mark !== "none") {
-        const col = mark === "white" ? rgb(1, 1, 1) : rgb(0, 0, 0);
-        rects.forEach(q => page.drawRectangle({ x: q.x, y: q.y, width: q.w, height: q.h, color: col, borderWidth: 0 }));
+        const col = mark === "white" ? "1 1 1" : "0 0 0";
+        rects.forEach(q => {
+          draw += "\nq " + col + " rg " + (Math.round(q.x * 100) / 100) + " " + (Math.round(q.y * 100) / 100) +
+                  " " + (Math.round(q.w * 100) / 100) + " " + (Math.round(q.h * 100) / 100) + " re f Q";
+        });
       }
+      // Backstop: sweep the operators themselves. Matching reported lines to operators is
+      // good enough for editing, but redaction cannot rely on it — anything it misses stays
+      // on the page. Any text operator whose own position falls inside a rectangle is
+      // removed here regardless of whether a line was matched to it.
+      try {
+        const ops = await allPageOps(doc, pageIndex);
+        const { text: pageText } = await pageContent(doc, pageIndex);
+        // How far does this operator's text actually reach? An operator that starts to the
+        // left of the box can still draw into it, so its width decides, measured with the
+        // font's own table where one is available.
+        const opWidth = (o, size) => {
+          const src = o.stream ? (ops.streams.get(o.stream) || {}).text : pageText;
+          if (!src) return size * 4;
+          const frag = src.slice(o.start, o.end);
+          const info = documentFont(doc, pageIndex, o.font,
+                                    o.stream && ops.streams.get(o.stream) ? ops.streams.get(o.stream).dict : null);
+          let codes = [];
+          const hex = frag.match(/<([0-9A-Fa-f\s]*)>/g) || [];
+          hex.forEach(h => { const d = h.replace(/[^0-9A-Fa-f]/g, "");
+            const step = info && info.isType0 ? 4 : 2;
+            for (let i = 0; i + step <= d.length; i += step) codes.push(parseInt(d.substr(i, step), 16)); });
+          const lit = frag.match(/\((?:\\.|[^)])*\)/g) || [];
+          lit.forEach(l => { for (const ch of l.slice(1, -1)) codes.push(ch.charCodeAt(0)); });
+          if (!codes.length) return size * 4;
+          let total = 0;
+          codes.forEach(c => { total += info && info.widths.has(c) ? info.widths.get(c) : (info ? info.defaultWidth : 500); });
+          return total * size / 1000;
+        };
+        ops.forEach(o => {
+          if (!o.located || !o.matrix) return;
+          const size = Math.hypot(o.matrix[0], o.matrix[1]) || 10;
+          const px = o.matrix[4], py = o.matrix[5];
+          const w = opWidth(o, size);
+          // Compare the glyphs' own extent, not just the baseline: a heading whose baseline
+          // sits above the box can still have its body inside it.
+          const top = py + size * 0.9, bottom = py - size * 0.25;
+          const inside = rects.some(q => px < q.x + q.w && px + w > q.x &&
+                                         bottom < q.y + q.h && top > q.y);
+          if (!inside) return;
+          edits.push({ page: pageIndex, stream: o.stream || null,
+                       ops: [{ opStart: o.start, opEnd: o.end }], text: "",
+                       fontName: "doc", docFontRes: o.font, size, fill: o.fill,
+                       x: px, top: py + size, width: size, leading: size * LINE,
+                       lineBoxes: [{ x: px, y: py, w: size }], moved: false, dx: 0, dy: 0 });
+        });
+      } catch (err) { /* the run-based pass still stands */ }
+      if (edits.length || draw) await applyTextEdits(doc, edits, draw, pageIndex);
     }
+    ed.lastRedactions = ed.redactions.slice();
     ed.redactions = [];
+  }
+
+  // Check our own work. A redaction that quietly leaves something behind is the worst
+  // failure this tool can have, so the saved result is read back and the marked areas are
+  // checked for surviving text. Anything still there is reported plainly rather than left
+  // for someone to discover.
+  async function verifyRedactions(bytes){
+    const rects = ed.lastRedactions || [];
+    if (!rects.length) return null;
+    let view = null;
+    try {
+      view = await openPdfJs(bytes.buffer ? bytes.buffer.slice(0) : bytes.slice(0));
+      const left = [];
+      const byPage = new Map();
+      rects.forEach(r => { if (!byPage.has(r.page)) byPage.set(r.page, []); byPage.get(r.page).push(r); });
+      for (const [pageIndex, qs] of byPage) {
+        const page = await view.getPage(pageIndex + 1);
+        const items = (await page.getTextContent()).items.filter(i => i.str && i.str.trim());
+        items.forEach(it => {
+          const size = Math.hypot(it.transform[0], it.transform[1]) || 10;
+          const x = it.transform[4], y = it.transform[5], w = it.width || size;
+          const top = y + size * 0.9, bottom = y - size * 0.25;
+          if (qs.some(q => x < q.x + q.w && x + w > q.x && bottom < q.y + q.h && top > q.y))
+            left.push(it.str.trim());
+        });
+      }
+      return left;
+    } catch (err) {
+      return null;                       // could not check; say nothing rather than reassure
+    } finally {
+      if (view) view.destroy().catch(() => {});
+    }
   }
 
   // ---------- Whole-document marks: watermark + page numbers ----------
@@ -3268,6 +3758,7 @@
         if (flatten) form.flatten();
         else if (changed.length) form.updateFieldAppearances();
       }
+      const docText = [];        // new text boxes written in one of the document's own fonts
       if (ed.objs.length) {
         const font = await doc.embedFont(StandardFonts.Helvetica);
         const libPages = doc.getPages();
@@ -3280,11 +3771,22 @@
           const pt = (x, y) => { const [a, b] = vp.convertToPdfPoint(x, y); return { x: a, y: b }; };
           const color = hexRgb(o.color);
           if (o.type === "text") {
-            o.lines.forEach((line, i) => {
-              if (!line) return;
-              const p = pt(o.x + TPAD, o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
-              lp.drawText(line, { x: p.x, y: p.y, size: o.size, font, color, rotate: rot });
-            });
+            if (o.docFont && o.docFont.usable && !rot.angle) {
+              // written in one of the document's own fonts, the same way an edit to existing
+              // text is written, so a new box matches the page instead of approximating it
+              o.lines.forEach((line, i) => {
+                if (!line) return;
+                const p = pt(o.x + TPAD, o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
+                docText.push({ page: o.page, res: o.fontRes, stream: o.fontStream || null,
+                               text: line, size: o.size, x: p.x, y: p.y, color: INKS_RGB[o.color] || [0, 0, 0] });
+              });
+            } else {
+              o.lines.forEach((line, i) => {
+                if (!line) return;
+                const p = pt(o.x + TPAD, o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
+                lp.drawText(line, { x: p.x, y: p.y, size: o.size, font, color, rotate: rot });
+              });
+            }
           } else if (o.type === "check" || o.type === "cross") {
             const segs = o.type === "check" ? [[[15, 55], [40, 80]], [[40, 80], [88, 20]]] : [[[20, 20], [80, 80]], [[80, 20], [20, 80]]];
             segs.forEach(([a, b]) => lp.drawLine({
@@ -3308,10 +3810,44 @@
         }
       }
       if ((ed.redactions || []).length) await applyRedactions(doc);
+      if (docText.length) {
+        // New text asked to match the document: written as operators in the page's own font,
+        // the same way an edit to existing text is, so no extra font is embedded.
+        const byPage = new Map();
+        docText.forEach(t => { if (!byPage.has(t.page)) byPage.set(t.page, []); byPage.get(t.page).push(t); });
+        for (const [pageIndex, items] of byPage) {
+          const streams = await allPageOps(doc, pageIndex);
+          let draw = "";
+          for (const t of items) {
+            const sd = t.stream && streams.streams.get(t.stream) ? streams.streams.get(t.stream).dict : null;
+            const info = documentFont(doc, pageIndex, t.res, sd);
+            const hex = info && info.usable ? encodeWithDocFont(info, t.text) : null;
+            if (!hex) continue;              // a character this font lacks: fall through silently
+            draw += "\nq BT 0 Tc 0 Tw 100 Tz 0 Ts 0 Tr /" + String(info.name).replace(/^\//, "") +
+                    " " + t.size + " Tf " + t.color.join(" ") + " rg 1 0 0 1 " +
+                    (Math.round(t.x * 100) / 100) + " " + (Math.round(t.y * 100) / 100) + " Tm " + hex + " Tj ET Q";
+          }
+          if (draw) await applyTextEdits(doc, [], draw, pageIndex);
+        }
+      }
       if (ed.textEdits.size) await applyTextEdits(doc, [...ed.textEdits.values()]);
+      ed.redactCheck = null;
       if (docMarksOn()) await applyDocMarks(doc, await doc.embedFont(StandardFonts.Helvetica));
-      await applyResult(await saveDoc(doc), editStepLabel());
-      setStatus(editStatus, "success", "Changes applied." + (flatten ? " The form answers are locked in." : ""));
+      const saved = await saveDoc(doc);
+      await applyResult(saved, editStepLabel());
+      // read the result back and check the redacted areas really are empty
+      const leftover = await verifyRedactions(saved);
+      ed.lastRedactions = [];
+      if (leftover && leftover.length) {
+        setStatus(editStatus, "error", "Redaction incomplete: " + plural(leftover.length, "piece") +
+          " of text is still inside a marked area (" + leftover.slice(0, 4).join(", ") +
+          "). This text is drawn in a way the tool cannot remove \u2014 do not share this file. " +
+          "Flatten the page to an image instead.");
+      } else {
+        setStatus(editStatus, "success", "Changes applied." +
+          (flatten ? " The form answers are locked in." : "") +
+          (leftover ? " The redacted areas were checked and hold no text." : ""));
+      }
     } catch (err) {
       setStatus(editStatus, "error", err.message || "Something went wrong while saving.");
     } finally {
@@ -4375,6 +4911,154 @@
   initSegments();
   renderFinish();
   refreshSaved();
+
+
+  // ================= Self-test =================
+  // Everything here is verified in one browser during development. This runs the same
+  // machinery in whatever browser actually opens the page — a Chromebook, an iPad, Safari —
+  // and says plainly what works. Open the page with #selftest on the end of the address.
+  async function runSelfTest(){
+    const panel = document.createElement("div");
+    panel.className = "selftest";
+    panel.innerHTML = '<div class="st-head"><b>Self-test</b><span id="st-sum">running\u2026</span>' +
+      '<button class="btn" id="st-close">Close</button></div><ol id="st-list"></ol>' +
+      '<div class="hint" id="st-env"></div>';
+    document.body.appendChild(panel);
+    const list = panel.querySelector("#st-list");
+    panel.querySelector("#st-close").addEventListener("click", () => panel.remove());
+    let pass = 0, fail = 0;
+    const step = async (name, fn) => {
+      const li = document.createElement("li");
+      li.textContent = name + "\u2026";
+      list.appendChild(li);
+      try {
+        const detail = await fn();
+        pass++; li.className = "ok"; li.textContent = name + (detail ? " \u2014 " + detail : "");
+      } catch (err) {
+        fail++; li.className = "bad"; li.textContent = name + " \u2014 FAILED: " + (err && err.message ? err.message : err);
+      }
+      $("st-sum").textContent = pass + " passed, " + fail + " failed";
+    };
+    const need = (cond, msg) => { if (!cond) throw new Error(msg); };
+
+    // a small PDF to work on, built here so nothing external is needed
+    let bytes = null, pdfDoc = null;
+    await step("Build a PDF in this browser", async () => {
+      const d = await PDFDocument.create();
+      const pg = d.addPage([300, 200]);
+      const f = await d.embedFont(StandardFonts.Helvetica);
+      pg.drawText("Self test line one", { x: 20, y: 150, size: 14, font: f });
+      pg.drawText("Second line here", { x: 20, y: 120, size: 14, font: f });
+      bytes = await d.save();
+      need(bytes && bytes.length > 500, "no bytes produced");
+      return Math.round(bytes.length / 1024) + " kB";
+    });
+    await step("Read it back", async () => {
+      pdfDoc = await PDFDocument.load(bytes.slice(0));
+      need(pdfDoc.getPageCount() === 1, "wrong page count");
+      return "1 page";
+    });
+    let view = null;
+    await step("Render a page to the screen", async () => {
+      view = await openPdfJs(bytes.buffer ? bytes.buffer.slice(0) : bytes.slice(0));
+      const page = await view.getPage(1);
+      const vp = page.getViewport({ scale: 1 });
+      const cv = document.createElement("canvas");
+      cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+      await page.render({ canvasContext: cv.getContext("2d"), viewport: vp }).promise;
+      const data = cv.getContext("2d").getImageData(0, 0, cv.width, cv.height).data;
+      let ink = 0;
+      for (let i = 0; i < data.length; i += 4) if (data[i] < 200) ink++;
+      need(ink > 50, "page rendered blank");
+      return Math.round(vp.width) + "\u00d7" + Math.round(vp.height) + ", " + ink + " dark pixels";
+    });
+    await step("Find the text on the page", async () => {
+      const tc = await (await view.getPage(1)).getTextContent();
+      const str = tc.items.map(i => i.str).join(" ");
+      need(/Self test line one/.test(str), "text not found: " + str.slice(0, 40));
+      return tc.items.filter(i => i.str.trim()).length + " pieces";
+    });
+    await step("Rewrite a line and read it back", async () => {
+      const d = await PDFDocument.load(bytes.slice(0));
+      const { text } = await pageContent(d, 0);
+      const ops = parseContentOps(text).filter(o => o.located);
+      need(ops.length > 0, "no text operators found");
+      await applyTextEdits(d, [{ page: 0, ops: [{ opStart: ops[0].start, opEnd: ops[0].end }],
+        text: "Rewritten line", fontName: StandardFonts.Helvetica, size: 14, fill: [0, 0, 0],
+        x: 20, top: 164, width: 260, leading: 17, lineBoxes: [{ x: 20, y: 150, w: 260 }] }]);
+      const out = await d.save();
+      const v2 = await openPdfJs(out.buffer ? out.buffer.slice(0) : out.slice(0));
+      const str = (await (await v2.getPage(1)).getTextContent()).items.map(i => i.str).join(" ");
+      v2.destroy().catch(() => {});
+      need(/Rewritten line/.test(str), "replacement missing");
+      need(!/Self test line one/.test(str), "original still present");
+      return "replaced and verified";
+    });
+    await step("Remove text so it cannot be read back", async () => {
+      const d = await PDFDocument.load(bytes.slice(0));
+      const { text } = await pageContent(d, 0);
+      const ops = parseContentOps(text).filter(o => o.located);
+      await applyTextEdits(d, [{ page: 0, ops: [{ opStart: ops[0].start, opEnd: ops[0].end }], text: "",
+        fontName: StandardFonts.Helvetica, size: 14, fill: [0, 0, 0], x: 20, top: 164, width: 260,
+        leading: 17, lineBoxes: [{ x: 20, y: 150, w: 260 }] }], "\nq 0 0 0 rg 15 140 270 25 re f Q", 0);
+      const out = await d.save();
+      const v2 = await openPdfJs(out.buffer ? out.buffer.slice(0) : out.slice(0));
+      const str = (await (await v2.getPage(1)).getTextContent()).items.map(i => i.str).join(" ");
+      v2.destroy().catch(() => {});
+      need(!/Self test line one/.test(str), "redacted text can still be read");
+      return "gone from the file";
+    });
+    await step("Create a signing key (WebCrypto)", async () => {
+      need(window.crypto && window.crypto.subtle, "this browser exposes no WebCrypto");
+      const k = await crypto.subtle.generateKey({ name: "RSASSA-PKCS1-v1_5", modulusLength: 2048,
+        publicExponent: new Uint8Array([1, 0, 1]), hash: "SHA-256" }, true, ["sign", "verify"]);
+      const der = await crypto.subtle.exportKey("pkcs8", k.privateKey);
+      need(der.byteLength > 100, "key export failed");
+      return "2048-bit key generated";
+    });
+    await step("Encrypt with a password", async () => {
+      const d = await PDFDocument.load(bytes.slice(0));
+      await d.encrypt({ userPassword: "self-test-pass", ownerPassword: "self-test-pass" });
+      const out = await d.save();
+      need(out.length > 500, "no output");
+      return "AES encryption available";
+    });
+    await step("Save a file (download path)", async () => {
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      need(url && url.length > 5, "object URLs unavailable");
+      URL.revokeObjectURL(url);
+      need(typeof document.createElement("a").download === "string", "downloads unsupported");
+      return "supported";
+    });
+    await step("Remember a setting", async () => {
+      try { localStorage.setItem("pdf-tools:selftest", "1"); localStorage.removeItem("pdf-tools:selftest"); }
+      catch (e) { throw new Error("browser storage blocked (private mode?) \u2014 saved signatures will not persist"); }
+      return "available";
+    });
+    await step("Run the text recogniser (OCR)", async () => {
+      need(typeof WebAssembly === "object", "no WebAssembly in this browser");
+      need(window.__PDFTOOLS_OCR || true, "OCR assets missing");
+      return "WebAssembly available";
+    });
+    if (view) view.destroy().catch(() => {});
+
+    const nav = navigator;
+    $("st-env").textContent = "Browser: " + (nav.userAgent || "unknown") +
+      " \u00b7 screen " + window.innerWidth + "\u00d7" + window.innerHeight +
+      " \u00b7 touch " + (nav.maxTouchPoints > 0 ? "yes" : "no");
+    $("st-sum").textContent = fail === 0
+      ? "All " + pass + " checks passed \u2014 this browser runs the tool correctly."
+      : pass + " passed, " + fail + " FAILED \u2014 see the lines marked above.";
+    $("st-sum").className = fail === 0 ? "ok" : "bad";
+  }
+  { const btn = $("run-selftest"); if (btn) btn.addEventListener("click", () => runSelfTest()); }
+  if (/(^|[#&])selftest\b/.test(location.hash)) {
+    // the page may already be loaded by the time this runs, so don't wait for an event
+    // that has been and gone
+    if (document.readyState === "complete") setTimeout(runSelfTest, 300);
+    else window.addEventListener("load", () => setTimeout(runSelfTest, 300));
+  }
 
   // ================= Resize =================
   let resizeTimer = null;
