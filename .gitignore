@@ -8,3 +8,5 @@ tests/node_modules/
 tests/fx/
 tests/rp.png
 tests/shot-*.png
+tests/*.pdf
+tests/*.png

@@ -3933,6 +3933,9 @@
     });
     if (!rep.js && nameTreeHas(doc, "JavaScript")) rep.js = Math.max(1, countNameTree(doc, "JavaScript"));
     rep.attachments += countNameTree(doc, "EmbeddedFiles");
+    // PDF 2.0 / PDF-A3 "associated files" live in /AF as well, and newer writers record an
+    // attachment there in addition to the name tree; count it only if it adds files.
+    { const af = doc.catalog.lookup(N("AF")); if (af instanceof PDFArray && af.size() > rep.attachments) rep.attachments = af.size(); }
     const raw = new Uint8Array(info.bytes);
     rep.revisions = Math.max(1, countOccurrences(raw, "startxref"));
     // dry-run garbage collection on a throwaway copy to count unused objects
@@ -3978,6 +3981,8 @@
   function stripAttachments(doc){
     const names = doc.catalog.lookup(N("Names"));
     if (names instanceof PDFDict) names.delete(N("EmbeddedFiles"));
+    // associated files (/AF) can hang off the catalog, pages, annotations and form objects
+    walkAll(doc, d => d.delete(N("AF")));
     doc.getPages().forEach(pg => {
       const annots = pg.node.lookup(N("Annots"));
       if (!(annots instanceof PDFArray)) return;

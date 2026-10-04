@@ -19,8 +19,8 @@ import random
 from PIL import Image, ImageFilter
 random.seed(7)
 # noisy, photo-like content so the JPEG is large enough for the compressor to shrink
-im=Image.effect_noise((1600,1200),90).convert('RGB').filter(ImageFilter.GaussianBlur(1))
-im.save('fx/photo-src.jpg', quality=95)
+im=Image.effect_noise((2200,1650),90).convert('RGB').filter(ImageFilter.GaussianBlur(1))
+im.save('fx/photo-src.jpg', quality=90)
 al=Image.new('RGBA',(600,600),(0,0,0,0))
 from PIL import ImageDraw
 d=ImageDraw.Draw(al); d.ellipse([40,40,560,560],fill=(200,40,40,200)); d.ellipse([200,200,400,400],fill=(20,60,160,90))

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-AsBNWgIvhj/idZtm5hRXy8FegZpiy+q6il3rHnRkRag=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-opK53c2x95Jvo5fTgl27RlW+QT7b10R/KWLb0VeBl88=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -5252,6 +5252,9 @@ else if (typeof exports === 'object')
     });
     if (!rep.js && nameTreeHas(doc, "JavaScript")) rep.js = Math.max(1, countNameTree(doc, "JavaScript"));
     rep.attachments += countNameTree(doc, "EmbeddedFiles");
+    // PDF 2.0 / PDF-A3 "associated files" live in /AF as well, and newer writers record an
+    // attachment there in addition to the name tree; count it only if it adds files.
+    { const af = doc.catalog.lookup(N("AF")); if (af instanceof PDFArray && af.size() > rep.attachments) rep.attachments = af.size(); }
     const raw = new Uint8Array(info.bytes);
     rep.revisions = Math.max(1, countOccurrences(raw, "startxref"));
     // dry-run garbage collection on a throwaway copy to count unused objects
@@ -5297,6 +5300,8 @@ else if (typeof exports === 'object')
   function stripAttachments(doc){
     const names = doc.catalog.lookup(N("Names"));
     if (names instanceof PDFDict) names.delete(N("EmbeddedFiles"));
+    // associated files (/AF) can hang off the catalog, pages, annotations and form objects
+    walkAll(doc, d => d.delete(N("AF")));
     doc.getPages().forEach(pg => {
       const annots = pg.node.lookup(N("Annots"));
       if (!(annots instanceof PDFArray)) return;
