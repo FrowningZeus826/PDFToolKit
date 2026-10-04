@@ -2129,7 +2129,7 @@
     if (unchanged) ed.textEdits.delete(ed.tsel);
     else {
       const docFont = activeDocFont(b);
-      blockEdit(ed.tsel, { text: value, fontName: font, size,
+      blockEdit(ed.tsel, { text: value, autoWrapped: false, fontName: font, size,
         docFontRes: docFont ? docFont.name : null,
         docFontCodes: docFont ? docFont : null });
     }
@@ -2505,6 +2505,32 @@
   // The original operator is deleted from the stream, so whatever was behind it stays.
   // Rewrites whole paragraphs: every original line of the block is removed, and the new
   // text is laid out again inside the block's box (which the person may have moved).
+  // Wrap that keeps every character: at each break exactly one space becomes the line break
+  // and nothing else is dropped or collapsed, so offsets into the text are the same before
+  // and after. Spaces left at the end of a line are allowed to hang past the edge. This is
+  // what on-page typing needs; a caret counted in characters stays where it was.
+  function wrapExact(font, text, size, maxW){
+    const out = [];
+    for (const para of String(text).split("\n")) {
+      const parts = para.split(/(\s+)/);                  // words and the runs between them
+      let line = "", pendingSep = "";
+      for (let k = 0; k < parts.length; k++) {
+        const part = parts[k];
+        if (k % 2 === 1) { pendingSep = part; continue; }
+        const word = part;
+        if (k === 0) { line = word; continue; }
+        const cand = line + pendingSep + word;
+        if (!word || font.widthOfTextAtSize(cand.replace(/\s+$/, ""), size) <= maxW || !line.trim()) line = cand;
+        else {
+          out.push(line + pendingSep.slice(1));              // one space of the run is the break
+          line = word;
+        }
+        pendingSep = "";
+      }
+      out.push(line + pendingSep);
+    }
+    return out;
+  }
   function wrapToWidth(font, text, size, maxW){
     const out = [];
     for (const para of String(text).split("\n")) {
@@ -3201,12 +3227,19 @@
     const size = e0.size || b.size;
     const info = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
     const measure = (t, sz) => info && info.usable ? widthWithDocFont(info, t, sz) : t.length * sz * 0.5;
-    const overflowing = lines.length > 1 && lines.some(l => measure(l, size) > width * 1.02);
+    const overflowing = lines.length > 1 && lines.some(l => measure(l.replace(/\s+$/, ""), size) > width * 1.02);
     let text = lines.join("\n");
-    if (overflowing) {
+    // Once the tool has wrapped a block, the line breaks in it are its own doing and not the
+    // writer's, so every edit re-flows it: text that shrinks (backspace, deleting a word)
+    // comes back up onto the previous line instead of staying stranded where the wrap put it.
+    const reflow = overflowing || e0.autoWrapped;
+    if (reflow) {
+      // Nothing is dropped or collapsed here, so the caret's character offset is unchanged.
       const caret = caretOffsetIn(els);
-      text = wrapToWidth({ widthOfTextAtSize: measure }, lines.join(" ").replace(/\s+/g, " ").trim(), size, width).join("\n");
-      blockEdit(i, { text: text });
+      const flowed = wrapExact({ widthOfTextAtSize: measure }, lines.join(" "), size, width).join("\n");
+      if (flowed === text) { blockEdit(i, { text: text, autoWrapped: true }); editSummary(); editUi(); return; }
+      text = flowed;
+      blockEdit(i, { text: text, autoWrapped: true });
       drawLayer();
       restoreCaret(i, caret);
       editSummary(); editUi();
@@ -3216,6 +3249,30 @@
     const ta = $("tx-text");
     if (ta && document.activeElement !== ta) ta.value = lines.join("\n");
     editSummary(); editUi();
+  }
+
+  // A wrapped line is its own element, so Backspace at the start of one (or Delete at the
+  // end of one) has nothing to act on. The break there was put in by the wrap and stands for
+  // a space, so deleting it means joining the two lines; the reflow then redistributes them.
+  function joinWrappedLines(ev, i, el){
+    const e0 = ed.textEdits.get(i);
+    if (!e0 || !e0.autoWrapped) return;
+    const sel = window.getSelection();
+    if (!sel || !sel.isCollapsed || !sel.anchorNode || !(el === sel.anchorNode || el.contains(sel.anchorNode))) return;
+    const li = +el.dataset.line;
+    const lineEl = k => eLayer.querySelector('.tprev[data-line="' + k + '"]');
+    let first = null, second = null;
+    if (ev.key === "Backspace" && sel.anchorOffset === 0 && (first = lineEl(li - 1))) second = el;
+    else if (ev.key === "Delete" && sel.anchorOffset >= el.textContent.length && (second = lineEl(li + 1))) first = el;
+    if (!first || !second) return;
+    ev.preventDefault();
+    const at = first.textContent.length;
+    first.textContent = first.textContent + second.textContent;
+    second.remove();
+    const r = document.createRange();
+    r.setStart(first.firstChild || first, first.firstChild ? at : 0); r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    onPageEdit(i);
   }
 
   // Where the caret sits, counted in characters from the start of the block.
@@ -3271,7 +3328,13 @@
     const fits = !e.resized && typed.length === b.lineBoxes.length &&
       (!helv || typed.every((ln, k) => helv.widthOfTextAtSize(ln, size) <= Math.max(b.lineBoxes[k].w, width) * 1.02));
     const places = [];
-    if (fits) typed.forEach((ln, k) => places.push({ text: ln, x: b.lineBoxes[k].x + dx, y: b.lineBoxes[k].y + dy }));
+    // While someone types on the page, the lines they see are the text; laying them out a
+    // second time with different metrics would move words between lines and drop spaces.
+    const exact = !fits && ed.typing === i && e.autoWrapped;
+    if (exact) {
+      const leading = b.leading > size * 0.8 ? b.leading : size * LINE;
+      typed.forEach((ln, k) => places.push({ text: ln, x, y: top - size - k * leading }));
+    } else if (fits) typed.forEach((ln, k) => places.push({ text: ln, x: b.lineBoxes[k].x + dx, y: b.lineBoxes[k].y + dy }));
     else {
       const lines = [];
       typed.forEach(t => {
@@ -3301,6 +3364,7 @@
         el.addEventListener("input", () => onPageEdit(i));
         el.addEventListener("keydown", ev => {
           if (ev.key === "Escape") { ev.preventDefault(); ed.typing = null; el.blur(); drawLayer(); editUi(); }
+          else if (ev.key === "Backspace" || ev.key === "Delete") joinWrappedLines(ev, i, el);
           ev.stopPropagation();          // Delete belongs to the text, not the block
         });
         el.addEventListener("pointerdown", ev => ev.stopPropagation());
