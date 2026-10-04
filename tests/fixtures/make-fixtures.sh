@@ -38,6 +38,18 @@ for name,(w,h),color in [('form-photo.jpg',(1200,1600),(250,248,240)),('wide-pho
     im.save('fx/'+name, quality=88)
 PY
 
+echo "==> realistic documents (letterhead quote, letter, scaled, Type 3, browser-printed, split runs...)"
+python3 - <<'PY'
+from PIL import Image, ImageDraw
+im=Image.new('RGB',(380,126),(30,60,120)); d=ImageDraw.Draw(im)
+d.rectangle([8,8,372,118],outline=(240,240,240),width=4); d.text((150,55),'LOGO',fill=(255,255,255))
+im.save('fx/logo.png')
+PY
+python3 fixtures/mkrealistic.py
+
+echo "==> oversized file (sparse, 260 MB, valid header) for the size-limit check"
+printf '%%PDF-1.4\n' > fx/huge.pdf && truncate -s 260M fx/huge.pdf
+
 echo "==> encrypted PDFs: every revision of the standard security handler"
 qpdf --encrypt user owner 256 -- fx/b.pdf fx/encrypted.pdf
 qpdf --encrypt "" owner 256 -- fx/a.pdf fx/owner-only.pdf

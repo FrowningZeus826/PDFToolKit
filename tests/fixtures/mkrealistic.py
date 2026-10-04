@@ -12,7 +12,7 @@ pdfmetrics.registerFont(TTFont('LibBold', '/usr/share/fonts/truetype/liberation/
 c = canvas.Canvas('fx/quote.pdf', pagesize=letter)
 # A logo placed with its own transform inside q/Q — exactly what a real vendor quote does,
 # and what broke position tracking until the transform was saved and restored properly.
-c.drawImage('/tmp/logo.png', 0.6*inch, 9.7*inch, width=1.9*inch, height=0.63*inch)
+c.drawImage('fx/logo.png', 0.6*inch, 9.7*inch, width=1.9*inch, height=0.63*inch)
 c.setFont('LibBold', 20); c.drawString(1*inch, 10*inch, 'Harbour Supply Co')
 c.setFont('Lib', 11)
 for i, line in enumerate(['Quote #Q57659', 'Date: 2/23/2023', 'Bill To: Dana Whitfield',
