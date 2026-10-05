@@ -1335,6 +1335,7 @@
 
   function drawLayer(){
     eLayer.innerHTML = "";
+    drawFindMarks();
     if (ed.mode === "doc") { drawDocMarksPreview(); return; }
     if (ed.mode === "text") { drawTextOverlays(); return; }
     if (ed.mode === "redact") { drawRedactions(); return; }
@@ -2368,6 +2369,7 @@
       const view = await openPdfJs(info.bytes);
       if (token !== ed.loadToken) { view.destroy().catch(() => {}); return; }
       ed.view = view;
+      find.index = null; find.indexToken++; find.matches = []; find.cur = -1;
       const wasOn = ed.page || 0, keepPage = info.keepPage;
       ed.pageCount = ed.view.numPages;
       ed.page = keepPage && wasOn < ed.pageCount ? wasOn : 0;
@@ -3646,6 +3648,132 @@
     b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
     b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
   });
+  // ---------- Find in the document ----------
+  // Every page's text is read once (through the same reader that draws the page) and searched
+  // as plain strings, so matches can cross the pieces a line is drawn in. Hits are highlighted
+  // on the page in every mode, and Enter steps through them, across pages.
+  const find = { open: false, query: "", index: null, indexToken: 0, matches: [], cur: -1, runToken: 0 };
+  async function buildFindIndex(){
+    if (find.index) return find.index;
+    const token = ++find.indexToken, view = ed.view, pages = [];
+    for (let i = 1; i <= view.numPages; i++) {
+      const content = await (await view.getPage(i)).getTextContent();
+      const items = content.items.filter(it => typeof it.str === "string");
+      let full = ""; const spans = [];
+      items.forEach(it => {
+        const size = Math.hypot(it.transform[0], it.transform[1]) || 10;
+        const x = it.transform[4], y = it.transform[5], len = it.str.length;
+        const w = it.width > 0 ? it.width : size * 0.5 * len;
+        const prev = spans[spans.length - 1];
+        // pieces of one line touch; a gap, a line end or a new baseline means a space
+        if (prev && full && !/\s$/.test(full) && !/^\s/.test(it.str) &&
+            (prev.eol || x - (prev.x + prev.w) > size * 0.15 || Math.abs(y - prev.y) > size * 0.5)) full += " ";
+        const start = full.length; full += it.str;
+        const st = content.styles && content.styles[it.fontName];
+        spans.push({ start, end: full.length, x, y, w, size, len, eol: !!it.hasEOL, str: it.str, family: (st && st.fontFamily) || "sans-serif" });
+      });
+      pages.push({ full, spans });
+      if (token !== find.indexToken || view !== ed.view) return null;     // the document changed underneath
+    }
+    find.index = pages;
+    return pages;
+  }
+  // Where inside a piece of text a match begins depends on the glyph widths, which differ a lot
+  // in a proportional font, so the pieces are measured rather than split by character count.
+  const findCtx = document.createElement("canvas").getContext("2d");
+  function findRects(pg, s, e){
+    const out = [];
+    pg.spans.forEach(sp => {
+      if (!sp.len || sp.end <= s || sp.start >= e) return;
+      const a = Math.max(s, sp.start) - sp.start, z = Math.min(e, sp.end) - sp.start;
+      let f0 = a / sp.len, f1 = z / sp.len;
+      try {
+        findCtx.font = "100px " + sp.family;
+        const whole = findCtx.measureText(sp.str).width;
+        if (whole > 0) { f0 = findCtx.measureText(sp.str.slice(0, a)).width / whole; f1 = findCtx.measureText(sp.str.slice(0, z)).width / whole; }
+      } catch (err) { /* keep the even split */ }
+      out.push({ x: sp.x + sp.w * f0, y: sp.y - sp.size * 0.22, w: Math.max(1, sp.w * (f1 - f0)), h: sp.size * 1.15 });
+    });
+    return out;
+  }
+  function findAll(pages, q){
+    const out = [];
+    pages.forEach((pg, pi) => {
+      let hay = pg.full.toLowerCase(), nd = q.toLowerCase();
+      if (hay.length !== pg.full.length) { hay = pg.full; nd = q; }       // case folding changed the length: stay exact
+      for (let from = 0, i; out.length < 3000 && (i = hay.indexOf(nd, from)) >= 0; from = i + Math.max(1, nd.length))
+        out.push({ page: pi, rects: findRects(pg, i, i + nd.length) });
+    });
+    return out;
+  }
+  function drawFindMarks(){
+    if (!find.open || !find.matches.length || !ed.vp) return;
+    find.matches.forEach((m, mi) => {
+      if (m.page !== ed.page) return;
+      m.rects.forEach(r => {
+        const q = ed.vp.convertToViewportRectangle([r.x, r.y, r.x + r.w, r.y + r.h]);
+        const el = document.createElement("div");
+        el.className = "fhit" + (mi === find.cur ? " cur" : "");
+        el.style.left = Math.min(q[0], q[2]) + "px"; el.style.top = Math.min(q[1], q[3]) + "px";
+        el.style.width = Math.abs(q[2] - q[0]) + "px"; el.style.height = Math.abs(q[3] - q[1]) + "px";
+        eLayer.appendChild(el);
+      });
+    });
+  }
+  function findCount(text){ $("find-count").textContent = text; }
+  async function findGo(i){
+    const n = find.matches.length; if (!n) return;
+    find.cur = (i + n) % n;
+    const m = find.matches[find.cur];
+    if (m.page !== ed.page) { ed.page = m.page; ed.sel = null; await editRender(); } else drawLayer();
+    findCount((find.cur + 1) + " of " + n + (n >= 3000 ? "+" : ""));
+    const hit = eLayer.querySelector(".fhit.cur");
+    if (hit && hit.scrollIntoView) hit.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+  async function runFind(){
+    const q = $("find-input").value, token = ++find.runToken;
+    find.query = q;
+    if (!q) { find.matches = []; find.cur = -1; findCount(""); drawLayer(); return; }
+    if (!find.index) findCount("Searching\u2026");
+    const pages = await buildFindIndex();
+    if (!pages || token !== find.runToken) return;
+    find.matches = findAll(pages, q);
+    if (!find.matches.length) {
+      find.cur = -1; drawLayer();
+      findCount(pages.some(p => p.full.trim()) ? "No matches" : "No text to search");
+      return;
+    }
+    // start from the first hit on this page or after it
+    const first = find.matches.findIndex(m => m.page >= ed.page);
+    await findGo(first < 0 ? 0 : first);
+  }
+  function openFind(){
+    if (!ed.view) return;
+    find.open = true; $("findbar").hidden = false;
+    const inp = $("find-input"); inp.focus(); inp.select();
+    if (inp.value) runFind();
+  }
+  function closeFind(){
+    find.open = false; $("findbar").hidden = true; find.runToken++;
+    drawLayer();
+  }
+  let findTimer = null;
+  $("find-input").addEventListener("input", () => { clearTimeout(findTimer); findTimer = setTimeout(runFind, 160); });
+  $("find-input").addEventListener("keydown", ev => {
+    if (ev.key === "Enter") { ev.preventDefault(); findGo(find.cur + (ev.shiftKey ? -1 : 1)); }
+    else if (ev.key === "Escape") { ev.preventDefault(); closeFind(); }
+    ev.stopPropagation();                 // typing here is not a page shortcut
+  });
+  $("find-next").addEventListener("click", () => findGo(find.cur + 1));
+  $("find-prev").addEventListener("click", () => findGo(find.cur - 1));
+  $("find-close").addEventListener("click", closeFind);
+  $("e-find").addEventListener("click", () => { find.open ? closeFind() : openFind(); });
+  document.addEventListener("keydown", ev => {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== "f") return;
+    if (!ed.view || $("edit-work").hidden || !$("panel-document").classList.contains("active")) return;
+    ev.preventDefault(); openFind();       // Ctrl/Cmd+F searches the document, not the web page
+  });
+
   // Reading comes first on a phone: the ribbon starts tucked away there unless it was left open
   { let saved = null; try { saved = localStorage.getItem("pdf-tools:ribbon-collapsed"); } catch (e) {}
     const narrow = window.matchMedia && window.matchMedia("(max-width: 760px)").matches;

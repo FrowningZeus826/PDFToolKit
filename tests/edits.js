@@ -886,6 +886,42 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      const m=await mp.p.evaluate(()=>({parent:document.getElementById('eprops').parentElement.className, hidden:document.getElementById('eprops').hidden}));
      check('props: on a phone the controls stay in the panel instead of covering the page', m.parent==='ctlcol' && !m.hidden, JSON.stringify(m));
      await mp.p.close(); }
+   // ---- find in the document ----
+   { const fp=(await H.newPage(b,H.LOCAL,false)).p; await fp.setViewport({width:1280,height:900});
+     await upload(fp,'#edit-input',FX('quote.pdf')); await fp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+     const count=()=>fp.$eval('#find-count',e=>e.textContent);
+     const typeQ=async q=>{ await fp.$eval('#find-input',e=>{e.value='';}); await fp.focus('#find-input'); await fp.keyboard.type(q); await sleep(1100); };
+     await fp.keyboard.down('Control'); await fp.keyboard.press('f'); await fp.keyboard.up('Control'); await sleep(300);
+     check('find: Ctrl+F opens the find bar with the box focused', !(await fp.$eval('#findbar',e=>e.hidden)) && await fp.evaluate(()=>document.activeElement&&document.activeElement.id==='find-input'));
+     await typeQ('flag');
+     const truth=execSync('pdftotext fx/quote.pdf -').toString().toLowerCase().split('flag').length-1;
+     check('find: the match count agrees with pdftotext', (await count())==='1 of '+truth && truth===3, (await count())+' vs '+truth);
+     check('find: every match on the page is highlighted, one of them as current', (await fp.$$('.fhit')).length===truth && (await fp.$$('.fhit.cur')).length===1);
+     // positions against pdftotext's own word boxes
+     const boxes=[...execSync('pdftotext -bbox fx/quote.pdf -').toString().matchAll(/xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">FLAG</g)].map(m=>m.slice(1,5).map(Number));
+     const hits=await fp.evaluate(()=>{const st=document.getElementById('estage').getBoundingClientRect(), k=612/st.width; return [...document.querySelectorAll('.fhit')].map(h=>{const r=h.getBoundingClientRect(); return [(r.left-st.left)*k,(r.top-st.top)*k,(r.right-st.left)*k,(r.bottom-st.top)*k];});});
+     const near=(h,w)=>Math.abs(h[0]-w[0])<3 && Math.abs(h[2]-w[2])<3 && h[1]<=w[3] && h[3]>=w[1] && Math.abs((h[1]+h[3])/2-(w[1]+w[3])/2)<4;
+     check('find: highlights sit on the words (checked against pdftotext boxes)', boxes.length===truth && boxes.every(w=>hits.some(h=>near(h,w))), JSON.stringify({hits:hits.map(h=>h.map(Math.round)),boxes:boxes.map(h=>h.map(Math.round))}));
+     await fp.keyboard.press('Enter'); await sleep(400); const second=await count();
+     await fp.keyboard.down('Shift'); await fp.keyboard.press('Enter'); await fp.keyboard.up('Shift'); await sleep(300); const back=await count();
+     await fp.keyboard.down('Shift'); await fp.keyboard.press('Enter'); await fp.keyboard.up('Shift'); await sleep(300); const wrap=await count();
+     check('find: Enter goes forward, Shift+Enter back, and it wraps around', second==='2 of 3' && back==='1 of 3' && wrap==='3 of 3', [second,back,wrap].join(' / '));
+     await typeQ('FLAG'); check('find: it ignores case', (await count())==='1 of 3', await count());
+     await typeQ('zzzqq'); check('find: no match says so and highlights nothing', (await count())==='No matches' && (await fp.$$('.fhit')).length===0, await count());
+     await fp.keyboard.press('Escape'); await sleep(300);
+     check('find: Escape closes the bar and clears the highlights', await fp.$eval('#findbar',e=>e.hidden) && (await fp.$$('.fhit')).length===0);
+     await fp.close(); }
+   { const fp=(await H.newPage(b,H.LOCAL,false)).p; await fp.setViewport({width:1280,height:900});
+     await upload(fp,'#edit-input',FX('a.pdf')); await fp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+     await fp.click('#e-find'); await sleep(200); await fp.keyboard.type('page'); await sleep(1300);
+     const seq=[]; for (let i=0;i<3;i++){ seq.push((await fp.$eval('#find-count',e=>e.textContent))+' p'+(await fp.$eval('#e-label',e=>e.textContent.match(/Page (\d+)/)[1]))+' hits'+(await fp.$$('.fhit')).length); await fp.keyboard.press('Enter'); await sleep(900); }
+     check('find: stepping carries the view to the page each match is on (including a rotated page)', seq.join(' | ')==='1 of 3 p1 hits1 | 2 of 3 p2 hits1 | 3 of 3 p3 hits1', seq.join(' | '));
+     await fp.close(); }
+   { const mp=(await H.newPage(b,H.LOCAL,true)).p; await upload(mp,'#edit-input',FX('quote.pdf')); await mp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
+     await mp.evaluate(()=>document.getElementById('e-find').click()); await sleep(300); await mp.keyboard.type('flag'); await sleep(1200);
+     const m=await mp.evaluate(()=>{const r=document.getElementById('findbar').getBoundingClientRect(); return {l:Math.round(r.left), r:Math.round(r.right), vw:innerWidth, count:document.getElementById('find-count').textContent, hits:document.querySelectorAll('.fhit').length};});
+     check('find: on a phone the bar fits the screen and still finds', m.l>=0 && m.r<=m.vw && m.count==='1 of 3' && m.hits===3, JSON.stringify(m));
+     await mp.close(); }
    // collapsing for reading
    const h0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().height));
    await p.evaluate(()=>document.getElementById('rb-collapse').click()); await sleep(900);

@@ -278,6 +278,17 @@
   .docribbon.collapsed ~ .workarea .ctlcol { top: calc(var(--hdr, 47px) + 64px); }
   .workarea:not(.has-props) .ctlcol { display: none; }
   .ctlcol .props:first-child { margin-top: 0; }
+  /* find in the document: a small bar over the corner of the page area, so it adds no height */
+  .stagecol { position: relative; }
+  .findbar { position: absolute; top: 10px; right: 24px; z-index: 55; display: flex; align-items: center; gap: 6px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px 5px 8px; box-shadow: 0 6px 22px rgba(0,0,0,.22); }
+  .findbar[hidden] { display: none; }
+  .findbar input[type=search] { width: 190px; padding: 5px 8px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .findbar #find-count { min-width: 64px; font-size: 12.5px; text-align: center; white-space: nowrap; }
+  .findbar .btn.icon { padding: 4px 8px; min-width: 28px; font-size: 12px; line-height: 1; }
+  .fhit { position: absolute; background: rgba(255, 213, 0, .45); mix-blend-mode: multiply; border-radius: 2px; pointer-events: none; }
+  .fhit.cur { background: rgba(255, 140, 0, .6); outline: 2px solid #E07B00; }
+  @media (max-width: 760px) { .findbar { left: 8px; right: 8px; top: 6px; } .findbar input[type=search] { flex: 1; width: auto; min-width: 0; } }
   /* the selected object's controls: a small bar attached to the object, over the page */
   #estage > #eprops { position: absolute; z-index: 60; margin: 0; padding: 6px 10px; line-height: normal; width: max-content;
     max-width: min(640px, calc(100% - 8px)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;

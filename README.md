@@ -36,6 +36,11 @@ field) floats over its edge instead of taking a column. For reading, the arrow a
 tab row tucks the ribbon away (double-click the open tab does the same); picking a tab brings it
 back. On a phone it starts tucked away so the document comes first.
 
+**Find** (the magnifier beside the zoom controls, or Ctrl/Cmd+F) searches the whole document:
+matches are highlighted on the page, Enter and Shift+Enter step through them across pages, and
+the count says where you are. It reads the same text layer the page is drawn from, so a scan has
+nothing to search until OCR has run.
+
 Save and Undo are icons in the header, next to the file's name and what has changed (Ctrl+S
 downloads what is open), so no row of the page is spent on them.
 

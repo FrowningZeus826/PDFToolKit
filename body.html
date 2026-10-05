@@ -105,6 +105,7 @@
               <div class="grp file">
                 <span class="dfname" id="edit-name"></span>
                 <label class="btn" id="edit-open" tabindex="0" role="button" title="Open another PDF">Open<input type="file" id="edit-input2" class="vh" accept="application/pdf,.pdf"></label>
+                <button class="btn icon" id="e-find" aria-label="Find in document" title="Find in document (Ctrl+F)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg></button>
                 <button class="btn icon" id="rb-collapse" aria-expanded="true" aria-controls="rbody" title="Hide the ribbon to read" aria-label="Hide the ribbon">&#8963;</button>
               </div>
             </div>
@@ -197,6 +198,13 @@
           </div>
           <div class="workarea" id="workarea">
             <div class="stagecol">
+              <div class="findbar" id="findbar" role="search" hidden>
+                <input type="search" id="find-input" placeholder="Find in document" aria-label="Find in document" autocomplete="off" spellcheck="false">
+                <span class="muted" id="find-count" role="status" aria-live="polite"></span>
+                <button class="btn icon" id="find-prev" aria-label="Previous match" title="Previous (Shift+Enter)">&#9650;</button>
+                <button class="btn icon" id="find-next" aria-label="Next match" title="Next (Enter)">&#9660;</button>
+                <button class="btn icon" id="find-close" aria-label="Close find" title="Close (Esc)">&#10005;</button>
+              </div>
               <div class="stage-wrap">
               <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div><div class="props" id="eprops" hidden></div></div>
             </div>
