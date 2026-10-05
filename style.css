@@ -215,6 +215,9 @@
   .proprow { display: flex; align-items: center; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
   .proprow input[type=range] { flex: 1; min-width: 120px; accent-color: var(--gold-dim); }
   .colorchip { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+  .colorchip { width: 16px; height: 16px; border-width: 1px; }
+  .colorrow { gap: 3px; flex-wrap: nowrap; }
+  .colorpick { width: 22px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
   .colorchip.active { box-shadow: 0 0 0 2px var(--gold-dim); }
   .fnav { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
   .warnline { color: var(--bad); font-size: 12.5px; margin-top: 6px; line-height: 1.45; }

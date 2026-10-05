@@ -1228,6 +1228,11 @@
     lockedSel: null, lockedAlso: [], showAll: null, editObj: null, focusEdit: false, lastPress: null,
     pendingImage: null
   };
+  // The built-in faces a text box can be set in, loaded once so lines can be measured (wrapped,
+  // aligned, sized) in the face that will actually be written, not always in Helvetica.
+  const STD_FONT_NAMES = ["Helvetica", "Helvetica-Bold", "Times-Roman", "Times-Bold", "Courier"];
+  const stdFonts = {};
+  const stdFontsReady = (async () => { const d = await PDFDocument.create(); for (const n of STD_FONT_NAMES) stdFonts[n] = await d.embedFont(n); })();
   const helvReady = (async () => { const d = await PDFDocument.create(); return d.embedFont(StandardFonts.Helvetica); })();
   let helv = null;
   helvReady.then(f => { helv = f; });
@@ -1261,10 +1266,18 @@
     try { w = docFont && docFont.usable ? widthWithDocFont(docFont, line, o.size) : (font || helv).widthOfTextAtSize(line, o.size); } catch (err) { w = helv.widthOfTextAtSize(line, o.size); }
     return f * Math.max(0, o.w - 2 * TPAD - w);
   }
+  // How wide a string is in the face this box will be written in: the document's own font where
+  // that was chosen, otherwise the built-in face it names.
+  function objMeasure(o){
+    if (o.docFont && o.docFont.usable) return (t, sz) => { try { return widthWithDocFont(o.docFont, t, sz); } catch (err) { return helv.widthOfTextAtSize(t, sz); } };
+    const f = stdFonts[o.fontKey] || helv;
+    return (t, sz) => f.widthOfTextAtSize(t, sz);
+  }
   function layoutText(o){
     const size = o.size, lineH = size * LINE;
     const W = ed.dims[o.page].W;
-    const width = s => helv.widthOfTextAtSize(s, size);
+    const measure = objMeasure(o);
+    const width = s => measure(s, size);
     const paras = o.text.split("\n");
     if (o.autoW) o.w = Math.min(Math.max(size, ...paras.map(width)) + 2 * TPAD + 1, W - o.x);
     o.w = Math.max(o.w, size + 2 * TPAD);
@@ -1328,7 +1341,56 @@
     }));
     drawLayer();
     editUi();
+    ensurePjsFonts(ed.page).then(found => { if (found && token === ed.renderToken) drawLayer(); });
   }
+
+  // pdf.js loads every font the page uses into the browser under its own name (g_d0_f1 ...), even
+  // a stand-in for one that is not embedded. Matching those to the fonts we describe (by base name)
+  // lets typed text be shown in exactly the face the page itself is drawn with.
+  const normFont = n => String(n || "").replace(/^[A-Z]{6}\+/, "").replace(/[\s_-]/g, "").toLowerCase();
+  async function ensurePjsFonts(pageIndex){
+    ed.pjsFonts = ed.pjsFonts || new Map();
+    if (ed.pjsFonts.has(pageIndex) || !ed.view) return false;
+    const map = new Map();
+    ed.pjsFonts.set(pageIndex, map);
+    try {
+      const page = await ed.view.getPage(pageIndex + 1);
+      const ops = await page.getOperatorList();
+      const SET = pdfjs.OPS && pdfjs.OPS.setFont;
+      for (let i = 0; i < ops.fnArray.length; i++) {
+        if (ops.fnArray[i] !== SET) continue;
+        const id = ops.argsArray[i][0];
+        let f = null;
+        try { f = page.commonObjs.has(id) ? page.commonObjs.get(id) : null; } catch (err) { f = null; }
+        if (f && f.loadedName && f.name && !map.has(normFont(f.name))) map.set(normFont(f.name), f.loadedName);
+      }
+    } catch (err) { /* the bundled faces still work */ }
+    return map.size > 0;
+  }
+  function pjsFamilyFor(baseFont, pageIndex){
+    const m = ed.pjsFonts && ed.pjsFonts.get(pageIndex == null ? ed.page : pageIndex);
+    if (!m || !baseFont) return null;
+    const k = normFont(baseFont);
+    if (m.has(k)) return m.get(k);
+    for (const [key, v] of m) if (key.startsWith(k) || k.startsWith(key)) return v;
+    return null;
+  }
+  const genericFor = n => /times|serif|georgia|garamond|minion|palatino|cambria/i.test(n) && !/sans/i.test(n) ? "serif" : /courier|mono|consolas|typewriter/i.test(n) ? "monospace" : "sans-serif";
+  // The CSS font for text in a given face. A "doc" face comes from the page itself.
+  function cssFontFor(fontKey, docInfo, px, lineHpx){
+    const k = fontKey || "Helvetica";
+    if (docInfo && docInfo.baseFont) {
+      const fam = pjsFamilyFor(docInfo.baseFont);
+      if (fam) return "normal normal " + px + "px/" + lineHpx + "px \"" + fam + "\", " + genericFor(docInfo.baseFont);
+    }
+    const bold = /Bold/i.test(k) || (docInfo && /bold|black|heavy/i.test(docInfo.baseFont || ""));
+    const ital = docInfo && /italic|oblique/i.test(docInfo.baseFont || "");
+    const w = (ital ? "italic " : "normal ") + (bold ? "bold " : "normal ");
+    if (/^Times/i.test(k) || (docInfo && genericFor(docInfo.baseFont) === "serif")) return w + px + "px/" + lineHpx + "px \"Times New Roman\", Times, \"Liberation Serif\", serif";
+    if (/^Courier/i.test(k) || (docInfo && genericFor(docInfo.baseFont) === "monospace")) return w + px + "px/" + lineHpx + "px \"Courier New\", Courier, \"Liberation Mono\", monospace";
+    return w + px + "px/" + lineHpx + "px \"Std Sans\", Arial, Helvetica, sans-serif";
+  }
+  const objCssFont = (o, s) => cssFontFor(o.fontKey, o.docFont && o.docFont.usable ? o.docFont : null, o.size * s, o.size * LINE * s);
 
   const CHECK_PATH = "M15 55 L40 80 L88 20", CROSS_PATH = "M20 20 L80 80 M80 20 L20 80";
   function svgMark(path, color){
@@ -1392,7 +1454,7 @@
           // typed on the page: one editable block, wrapped by the browser at the box's width
           const d = document.createElement("div");
           d.className = "tedit" + (o.autoW ? "" : " wrap");
-          d.style.font = o.size * s + "px/" + o.size * LINE * s + "px \"Std Sans\", Arial, Helvetica, sans-serif";
+          d.style.font = objCssFont(o, s);
           d.style.textAlign = o.align || "left";
           d.dataset.ph = "Type here";
           d.contentEditable = PLAINTEXT ? "plaintext-only" : "true";
@@ -1405,7 +1467,7 @@
         } else o.lines.forEach(l => {
           const d = document.createElement("div");
           d.className = "tl";
-          d.style.font = o.size * s + "px/" + o.size * LINE * s + "px \"Std Sans\", Arial, Helvetica, sans-serif";
+          d.style.font = objCssFont(o, s);
           d.textContent = l || "\u200b";
           d.style.textAlign = o.align || "left";
           el.appendChild(d);
@@ -1618,17 +1680,25 @@
     } catch (err) { setStatus(editStatus, "error", err.message || "That image couldn't be read."); }
   });
 
+  const PALETTE = { "#141414": "Black", "#B3261E": "Red", "#E8710A": "Orange", "#2E7D32": "Green", "#1B3A8C": "Blue", "#7B1FA2": "Purple" };
+  function inkRgb(h){ const c = hexRgb(/^#[0-9a-f]{6}$/i.test(h) ? h : "#141414"); return [c.red, c.green, c.blue]; }
   function colorChips(o){
-    const row = document.createElement("div"); row.className = "proprow";
+    const row = document.createElement("div"); row.className = "proprow colorrow";
     const lab = document.createElement("span"); lab.className = "muted"; lab.textContent = "Color";
     row.appendChild(lab);
-    Object.entries(INKS).forEach(([hex, name]) => {
+    const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
+    Object.entries(PALETTE).forEach(([hex, name]) => {
       const b = document.createElement("button");
-      b.type = "button"; b.className = "colorchip" + (o.color === hex ? " active" : "");
-      b.style.background = hex; b.setAttribute("aria-label", name); b.title = name;
+      b.type = "button"; b.className = "colorchip" + (same(o.color, hex) ? " active" : "");
+      b.dataset.hex = hex; b.style.background = hex; b.setAttribute("aria-label", name); b.title = name;
       b.addEventListener("click", () => { o.color = hex; drawLayer(); editUi(); });
       row.appendChild(b);
     });
+    const pick = document.createElement("input");
+    pick.type = "color"; pick.className = "colorpick"; pick.id = "ep-color"; pick.value = /^#[0-9a-f]{6}$/i.test(o.color) ? o.color.toLowerCase() : "#141414";
+    pick.title = "More colors…"; pick.setAttribute("aria-label", "Custom color");
+    pick.addEventListener("input", () => { o.color = pick.value.toUpperCase(); drawLayer(); syncProps(o); });
+    row.appendChild(pick);
     return row;
   }
 
@@ -1691,7 +1761,8 @@
       const on = (o.align || "left") === bt.dataset.align;
       bt.classList.toggle("armed", on); bt.setAttribute("aria-pressed", on ? "true" : "false");
     });
-    box.querySelectorAll(".colorchip").forEach(c => c.classList.toggle("active", c.title === INKS[o.color]));
+    box.querySelectorAll(".colorchip").forEach(c => c.classList.toggle("active", String(c.dataset.hex).toLowerCase() === String(o.color).toLowerCase()));
+    const cp = box.querySelector(".colorpick"); if (cp && /^#[0-9a-f]{6}$/i.test(o.color)) cp.value = o.color.toLowerCase();
     const w = $("ep-warn"); if (w) w.hidden = !(o.raw && cleanText(o.raw).bad);
   }
   function renderProps(){
@@ -1935,12 +2006,19 @@
     sel.value = [...sel.options].some(o => o.value === keep) ? keep : (info && info.usable ? "doc" : StandardFonts.Helvetica);
   }
 
+  // What an edit records about its font: the choice, and for one of the document's own faces the
+  // resource to write it with. A new edit starts in the document's font where it can be reused.
+  function blockFontFields(b, value){
+    const info = value === "doc" ? docFontFor(b)
+      : (typeof value === "string" && value.indexOf("doc:") === 0) ? docSiblingFor(b, value.slice(4)) : null;
+    return { fontName: value, docFontRes: info ? info.name : null, docFontCodes: info || null };
+  }
   function blockEdit(i, patch){
     const b = ed.blocks[i];
-    const cur = ed.textEdits.get(i) || { page: ed.page, stream: b.stream || null, ops: b.ops, text: b.text, fontName: StandardFonts.Helvetica,
+    const cur = ed.textEdits.get(i) || Object.assign({ page: ed.page, stream: b.stream || null, ops: b.ops, text: b.text, fontName: StandardFonts.Helvetica,
       size: b.size, fill: b.fill, x: b.x, top: b.top, width: b.w, height: b.height, leading: b.leading,
       lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0, align: "left",
-      box: { x: b.x, y: b.minY, w: b.w, h: (b.maxY - b.minY) + b.h } };
+      box: { x: b.x, y: b.minY, w: b.w, h: (b.maxY - b.minY) + b.h } }, blockFontFields(b, fontDefaultFor(b)));
     ed.textEdits.set(i, Object.assign(cur, patch));
     return cur;
   }
@@ -2183,7 +2261,7 @@
     drawLayer(); editUi();
   }));
   { const sel = $("rb-font"), size = $("rb-size");
-    if (sel) sel.addEventListener("change", () => { if (ed.tsel !== null) { blockEdit(ed.tsel, { fontName: sel.value }); drawLayer(); editUi(); } });
+    if (sel) sel.addEventListener("change", () => { if (ed.tsel !== null) { blockEdit(ed.tsel, blockFontFields(ed.blocks[ed.tsel], sel.value)); drawLayer(); editUi(); } });
     if (size) size.addEventListener("input", () => { if (ed.tsel !== null && +size.value > 0) { blockEdit(ed.tsel, { size: +size.value }); drawLayer(); editUi(); } }); }
 
   function renderTextPanel(){
@@ -2482,7 +2560,7 @@
       // Loads can overlap (apply, undo, then a new file). Anything older than the newest
       // request must bail out instead of overwriting the state the newer one has set up.
       const token = ++ed.loadToken;
-      await helvReady; helv = await helvReady;
+      await helvReady; helv = await helvReady; await stdFontsReady;
       if (token !== ed.loadToken) return;
       if (ed.view) ed.view.destroy().catch(() => {});
       editResetObjects();
@@ -3049,6 +3127,14 @@
     return "<" + hex + ">";
   }
   function widthWithDocFont(info, text, size){
+    if (!info.isType0 && !info.widths.size) {
+      // Standard-14 fonts carry no /Widths; use the built-in metrics.
+      const b = info.baseFont || "";
+      const bold = /bold/i.test(b);
+      const key = /courier/i.test(b) ? "Courier" : /times/i.test(b) ? (bold ? "Times-Bold" : "Times-Roman") : /helvetica|arial/i.test(b) ? (bold ? "Helvetica-Bold" : "Helvetica") : null;
+      const f = key && stdFonts[key];
+      if (f) { try { return f.widthOfTextAtSize(String(text), size); } catch (e) { /* fall through */ } }
+    }
     let total = 0;
     for (const ch of String(text)) {
       const g = info.toCode.get(ch);
@@ -3592,7 +3678,15 @@
         el.style.textAlign = e.align;
       }
       el.style.fontSize = (size * s) + "px";
-      el.style.fontFamily = CSS_FONT[e.fontName] || CSS_FONT.Helvetica;
+      {
+        const dInfo = e.docFontCodes && /^doc/.test(e.fontName || "") ? e.docFontCodes : null;
+        const fam = dInfo ? pjsFamilyFor(dInfo.baseFont) : null;
+        if (fam) { el.style.fontFamily = "\"" + fam + "\", " + genericFor(dInfo.baseFont); el.style.fontWeight = "normal"; el.style.fontStyle = "normal"; }
+        else {
+          el.style.fontFamily = CSS_FONT[e.fontName] || CSS_FONT.Helvetica;
+          el.style.fontWeight = /Bold/i.test(e.fontName || "") ? "bold" : "normal";
+        }
+      }
       const [r, g, bl] = e.fill || [0, 0, 0];
       el.style.color = "rgb(" + Math.round(r * 255) + "," + Math.round(g * 255) + "," + Math.round(bl * 255) + ")";
       eLayer.appendChild(el);
@@ -3628,7 +3722,7 @@
       const e = ed.textEdits.get(i);
       if (e) previewBlock(i, b, e);
       else if (ed.tsel === i) previewBlock(i, b, {
-        text: b.text, size: b.size, fill: b.fill, x: b.x, top: b.top,
+        text: b.text, size: b.size, fill: b.fill, x: b.x, top: b.top, fontName: fontDefaultFor(b), docFontCodes: docFontFor(b),
         width: b.w, leading: b.leading, lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0 });
       const x = e && e.moved ? e.x : b.x, top = e && e.moved ? e.top : b.top;
       const w = e && e.width ? e.width : b.w;
@@ -4240,6 +4334,8 @@
       const docText = [];        // new text boxes written in one of the document's own fonts
       if (ed.objs.length) {
         const font = await doc.embedFont(StandardFonts.Helvetica);
+        const stdCache = new Map();
+        const stdFontFor = async k => { const n = STD_FONT_NAMES.includes(k) ? k : "Helvetica"; if (!stdCache.has(n)) stdCache.set(n, await doc.embedFont(n)); return stdCache.get(n); };
         const libPages = doc.getPages();
         const images = new Map();
         for (const o of ed.objs) {
@@ -4257,13 +4353,14 @@
                 if (!line) return;
                 const p = pt(o.x + TPAD + boxAlignShift(o, line, o.docFont), o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
                 docText.push({ page: o.page, res: o.fontRes, stream: o.fontStream || null,
-                               text: line, size: o.size, x: p.x, y: p.y, color: INKS_RGB[o.color] || [0, 0, 0] });
+                               text: line, size: o.size, x: p.x, y: p.y, color: inkRgb(o.color) });
               });
             } else {
+              const face = await stdFontFor(o.fontKey);
               o.lines.forEach((line, i) => {
                 if (!line) return;
-                const p = pt(o.x + TPAD + boxAlignShift(o, line, null, font), o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
-                lp.drawText(line, { x: p.x, y: p.y, size: o.size, font, color, rotate: rot });
+                const p = pt(o.x + TPAD + boxAlignShift(o, line, null, face), o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
+                lp.drawText(line, { x: p.x, y: p.y, size: o.size, font: face, color, rotate: rot });
               });
             }
           } else if (o.type === "check" || o.type === "cross") {
@@ -5107,7 +5204,7 @@
       progress(3, "Starting the OCR engine\u2026");
       await tick();
       eng = await startOcrEngine($("ocr-lang").value.split("+"));
-      await helvReady; helv = await helvReady;
+      await helvReady; helv = await helvReady; await stdFontsReady;
       const doc = await loadPdf(info.bytes.slice(0), info.file.name);
       const font = await doc.embedFont(StandardFonts.Helvetica);
       pdfv = await openPdfJs(info.bytes);
