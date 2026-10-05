@@ -1225,7 +1225,7 @@
     objs: [], seq: 0, sel: null, dims: {}, scale: 1,
     fields: [], fsel: -1, renderToken: 0, loadToken: 0, renderTask: null, needsRender: false, busy: false,
     runs: [], blocks: [], tsel: null, typing: null, textEdits: new Map(), vp: null, redactions: [], grouping: null,
-    lockedSel: null, lockedAlso: [], showAll: null,
+    lockedSel: null, lockedAlso: [], showAll: null, editObj: null, focusEdit: false, lastPress: null,
     pendingImage: null
   };
   const helvReady = (async () => { const d = await PDFDocument.create(); return d.embedFont(StandardFonts.Helvetica); })();
@@ -1344,6 +1344,8 @@
 
   function drawLayer(){
     eLayer.innerHTML = "";
+    if (ed.editObj !== null && ed.editObj !== ed.sel) ed.editObj = null;       // typing ends when the selection moves on
+    dropEmptyBoxes();
     drawFindMarks();
     if (ed.mode === "doc") { drawDocMarksPreview(); return; }
     if (ed.mode === "text") { drawTextOverlays(); return; }
@@ -1375,6 +1377,7 @@
       eLayer.appendChild(el);
     }));
 
+    let focusAfterDraw = null;
     ed.objs.filter(o => o.page === ed.page).forEach(o => {
       const el = document.createElement("div");
       el.className = "eobj t-" + o.type + (o.id === ed.sel ? " sel" : "");
@@ -1384,7 +1387,22 @@
         el.style.color = o.color;
         const empty = !o.text.trim();
         if (empty) el.classList.add("empty");
-        o.lines.forEach(l => {
+        el.title = ed.editObj === o.id ? "" : "Double-click, or press Enter, to type";
+        if (ed.editObj === o.id) {
+          // typed on the page: one editable block, wrapped by the browser at the box's width
+          const d = document.createElement("div");
+          d.className = "tedit" + (o.autoW ? "" : " wrap");
+          d.style.font = o.size * s + "px/" + o.size * LINE * s + "px \"Std Sans\", Arial, Helvetica, sans-serif";
+          d.style.textAlign = o.align || "left";
+          d.dataset.ph = "Type here";
+          d.contentEditable = PLAINTEXT ? "plaintext-only" : "true";
+          d.spellcheck = false;
+          d.setAttribute("role", "textbox"); d.setAttribute("aria-label", "Text");
+          d.textContent = o.raw;
+          wireTextEdit(d, o);
+          el.appendChild(d);
+          if (ed.focusEdit) { ed.focusEdit = false; focusAfterDraw = d; }
+        } else o.lines.forEach(l => {
           const d = document.createElement("div");
           d.className = "tl";
           d.style.font = o.size * s + "px/" + o.size * LINE * s + "px \"Std Sans\", Arial, Helvetica, sans-serif";
@@ -1409,6 +1427,7 @@
       wireObj(el, h, o);
       eLayer.appendChild(el);
     });
+    if (focusAfterDraw) caretToEnd(focusAfterDraw);       // a box that was just created or double-clicked takes the typing
   }
 
   // ---------- Object interaction ----------
@@ -1420,10 +1439,16 @@
   }
   function wireObj(el, handle, o){
     el.addEventListener("click", e => e.stopPropagation());
-    el.addEventListener("dblclick", e => { e.stopPropagation(); if (o.type === "text") { const t = $("ep-text"); if (t) t.focus(); } });
+    el.addEventListener("dblclick", e => { e.stopPropagation(); if (o.type === "text" && ed.editObj !== o.id) startObjEdit(o.id); });
     el.addEventListener("pointerdown", e => {
       if (ed.mode !== "annotate" || e.button !== 0) return;
+      if (e.target.closest && e.target.closest(".tedit")) return;           // inside the text being typed: the caret's business
       e.preventDefault(); e.stopPropagation();
+      // selecting redraws the box, so the browser's own double-click count does not survive:
+      // a second press on the selected text box, soon after the first, is tracked here instead
+      const now = Date.now(), again = o.type === "text" && ed.sel === o.id && ed.lastPress && ed.lastPress.id === o.id && now - ed.lastPress.t < 450 && e.target !== handle;
+      ed.lastPress = { id: o.id, t: now };
+      if (again) { ed.lastPress = null; startObjEdit(o.id); return; }
       const resizing = e.target === handle;
       if (ed.sel !== o.id) { ed.sel = o.id; ed.tool = null; drawLayer(); editUi(); }
       const target = eLayer.querySelector(".eobj.sel") || el;
@@ -1439,7 +1464,6 @@
         clampObj(o);
         if (resizing && o.type === "text") { drawLayer(); return; }
         Object.assign(target.style, { left: o.x * s + "px", top: o.y * s + "px", width: o.w * s + "px", height: o.h * s + "px" });
-        positionProps();
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
@@ -1484,8 +1508,8 @@
     ed.objs.push(o);
     ed.sel = o.id;
     ed.tool = null;
+    ed.editObj = o.type === "text" ? o.id : null; ed.focusEdit = o.type === "text";
     drawLayer(); editUi();
-    if (o.type === "text") { const t = $("ep-text"); if (t) { t.focus(); t.select(); } }
   }
 
   // drag a rectangle over what must go
@@ -1608,67 +1632,81 @@
     return row;
   }
 
-  // The selected object's controls ride next to the object, above it or below it when there is
-  // no room, so nothing is added to the ribbon and the page does not move when you select
-  // something. On a phone, where a bar over the page would cover it, they stay in the panel.
-  const narrowScreen = () => !!(window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
-  function placeProps(){
-    const box = $("eprops"), want = narrowScreen() ? document.querySelector(".ctlcol") : eStage;
-    if (box.parentElement === want) return;
-    if (want === eStage) eStage.appendChild(box);
-    else want.insertBefore(box, $("fpanel"));
-    box.style.left = box.style.top = "";
+  // ---------- The selected item's controls, in the ribbon ----------
+  // They take the place of the tool buttons in the Add-to-page row while something is selected,
+  // so the ribbon is the same height and the page does not move. Text is typed on the page itself.
+  const PLAINTEXT = (() => { const d = document.createElement("div"); try { d.contentEditable = "plaintext-only"; } catch (e) { return false; } return d.contentEditable === "plaintext-only"; })();
+  const readTyped = d => PLAINTEXT ? d.textContent : d.innerText.replace(/\n$/, "");
+  function caretToEnd(d){
+    d.focus();
+    const r = document.createRange(), sel = window.getSelection();
+    r.selectNodeContents(d); r.collapse(false); sel.removeAllRanges(); sel.addRange(r);
   }
-  function positionProps(){
-    const box = $("eprops");
-    if (box.hidden || box.parentElement !== eStage) return;
-    const el = eLayer.querySelector(".eobj.sel");
-    if (!el) return;
-    const gap = 10, w = box.offsetWidth, h = box.offsetHeight, sw = eStage.clientWidth;
-    let top = el.offsetTop - h - gap;
-    if (top < 4) top = el.offsetTop + el.offsetHeight + gap;      // no room above: sit below
-    const left = Math.max(4, Math.min(el.offsetLeft, sw - w - 4));
-    box.style.left = left + "px"; box.style.top = Math.max(4, top) + "px";
+  // Start typing in a text box on the page.
+  function startObjEdit(id){
+    const o = ed.objs.find(x => x.id === id);
+    if (!o || o.type !== "text") return;
+    ed.sel = id; ed.tool = null; ed.editObj = id; ed.focusEdit = true;
+    drawLayer(); editUi();
   }
-  ["pointerdown", "click", "dblclick"].forEach(t => $("eprops").addEventListener(t, e => e.stopPropagation()));
-  window.matchMedia && window.matchMedia("(max-width: 760px)").addEventListener("change", () => { placeProps(); positionProps(); });
-  function renderProps(){ placeProps(); renderPropsInner(); positionProps(); }
-  function renderPropsInner(){
-    const box = $("eprops");
-    const o = ed.objs.find(x => x.id === ed.sel);
-    const active = document.activeElement && document.activeElement.id;
-    if (!o || ed.mode !== "annotate") { box.hidden = true; box.innerHTML = ""; return; }
-    // Keep the text box (and its cursor) if it's already showing this object.
-    if (!box.hidden && box.dataset.obj === String(o.id) && active === "ep-text") {
-      box.querySelectorAll(".colorchip").forEach(c => c.classList.toggle("active", c.style.background && c.title === INKS[o.color]));
-      return;
+  // What was typed becomes the box's text; the box is re-measured and resized in place, without
+  // redrawing, so the caret stays where it is.
+  function onObjInput(o, d){
+    o.raw = readTyped(d);
+    const c = cleanText(o.raw);
+    o.text = c.text;
+    layoutText(o); clampObj(o); layoutText(o);
+    const el = d.closest(".eobj"), s = ed.scale;
+    if (el) {
+      Object.assign(el.style, { left: o.x * s + "px", top: o.y * s + "px", width: o.w * s + "px", height: o.h * s + "px" });
+      el.classList.toggle("empty", !o.text.trim());
     }
+    d.classList.toggle("wrap", !o.autoW);
+    const w = $("ep-warn"); if (w) w.hidden = !c.bad;
+    editSummary();
+  }
+  function wireTextEdit(d, o){
+    d.addEventListener("input", () => onObjInput(o, d));
+    d.addEventListener("keydown", ev => {
+      if (ev.key === "Escape") { ev.preventDefault(); ed.sel = null; ed.editObj = null; drawLayer(); editUi(); return; }
+      if (!PLAINTEXT && ev.key === "Enter") { ev.preventDefault(); document.execCommand("insertLineBreak"); onObjInput(o, d); }
+      if (!(ev.ctrlKey || ev.metaKey)) ev.stopPropagation();     // typing is not a page shortcut: Delete here is text, not the item
+    });
+    d.addEventListener("paste", ev => {
+      if (PLAINTEXT) return;
+      ev.preventDefault(); document.execCommand("insertText", false, (ev.clipboardData || window.clipboardData).getData("text"));
+    });
+    d.addEventListener("pointerdown", ev => ev.stopPropagation());
+  }
+  // An empty text box that is no longer selected was never meant to stay.
+  function dropEmptyBoxes(){
+    const keep = ed.objs.filter(o => !(o.type === "text" && !String(o.text).trim() && o.id !== ed.sel));
+    if (keep.length !== ed.objs.length) ed.objs = keep;
+  }
+  function syncProps(o){
+    const box = $("eprops");
+    const f = $("ep-font"); if (f && document.activeElement !== f) f.value = o.fontKey || StandardFonts.Helvetica;
+    const z = $("ep-size"); if (z && document.activeElement !== z) z.value = String(o.size);
+    box.querySelectorAll(".alignbtn").forEach(bt => {
+      const on = (o.align || "left") === bt.dataset.align;
+      bt.classList.toggle("armed", on); bt.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    box.querySelectorAll(".colorchip").forEach(c => c.classList.toggle("active", c.title === INKS[o.color]));
+    const w = $("ep-warn"); if (w) w.hidden = !(o.raw && cleanText(o.raw).bad);
+  }
+  function renderProps(){
+    const box = $("eprops"), pane = $("rp-annotate");
+    const o = ed.objs.find(x => x.id === ed.sel);
+    if (!o || ed.mode !== "annotate") { box.hidden = true; box.innerHTML = ""; box.dataset.obj = ""; pane.classList.remove("has-obj"); return; }
+    pane.classList.add("has-obj");
+    // choosing an item means editing: bring the ribbon back if it was tucked away for reading
+    if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, false);
+    if (box.dataset.obj === String(o.id) && !box.hidden) { syncProps(o); return; }
     box.hidden = false; box.dataset.obj = String(o.id); box.innerHTML = "";
     const names = { text: "Text", check: "Checkmark", cross: "X mark", hl: "Highlight", box: "Box", white: "Whiteout", image: "Image" };
-    const head = document.createElement("div"); head.className = "prophead";
-    const t = document.createElement("b"); t.textContent = names[o.type];
-    const del = document.createElement("button"); del.className = "btn"; del.textContent = "Delete"; del.addEventListener("click", () => deleteObj(o.id));
-    head.append(t, del);
-    box.appendChild(head);
-    // done with this item: the bar goes away and the item stays on the page
-    const done = document.createElement("button");
-    done.type = "button"; done.className = "propclose"; done.textContent = "\u2715";
-    done.setAttribute("aria-label", "Close these controls"); done.title = "Done (Esc)";
-    done.addEventListener("click", () => { ed.sel = null; drawLayer(); editUi(); });
-    box.appendChild(done);
+    const nm = document.createElement("b"); nm.className = "objname"; nm.textContent = names[o.type];
+    box.appendChild(nm);
     if (o.type === "text") {
-      const ta = document.createElement("textarea");
-      ta.id = "ep-text"; ta.rows = 3; ta.value = o.raw; ta.placeholder = "Type here"; ta.setAttribute("aria-label", "Text");
-      const warn = document.createElement("div"); warn.className = "warnline"; warn.hidden = true;
-      warn.textContent = "Some characters can't be used in PDF text and were replaced with ?.";
-      ta.addEventListener("keydown", ev => { if (ev.key === "Escape") { ev.preventDefault(); ed.sel = null; drawLayer(); editUi(); } });
-      ta.addEventListener("input", () => {
-        o.raw = ta.value;
-        const c = cleanText(ta.value);
-        o.text = c.text; warn.hidden = !c.bad;
-        layoutText(o); clampObj(o); layoutText(o);
-        drawLayer();
-      });
       const fontRow = document.createElement("div"); fontRow.className = "proprow";
       const fl = document.createElement("span"); fl.className = "muted"; fl.textContent = "Font";
       const fsel = document.createElement("select"); fsel.id = "ep-font"; fsel.setAttribute("aria-label", "Font");
@@ -1694,34 +1732,46 @@
         o.fontStream = o.docFont ? (fsel.value.slice(4).split("|")[1] || null) : null;
         layoutText(o); clampObj(o); layoutText(o); drawLayer();
       });
-      fontRow.appendChild(fl); fontRow.appendChild(fsel);
+      fontRow.append(fl, fsel);
 
-      const size = document.createElement("div"); size.className = "proprow";
+      const sizeRow = document.createElement("div"); sizeRow.className = "proprow";
       const sl = document.createElement("span"); sl.className = "muted"; sl.textContent = "Size";
-      const r = document.createElement("input"); r.type = "range"; r.min = "6"; r.max = "40"; r.value = String(o.size); r.setAttribute("aria-label", "Text size");
-      const v = document.createElement("span"); v.className = "muted"; v.textContent = o.size + " pt";
-      r.addEventListener("input", () => { o.size = +r.value; v.textContent = o.size + " pt"; layoutText(o); clampObj(o); layoutText(o); drawLayer(); });
-      size.append(sl, r, v);
+      const sz = document.createElement("input"); sz.type = "number"; sz.id = "ep-size"; sz.min = "6"; sz.max = "40"; sz.step = "1"; sz.value = String(o.size);
+      sz.setAttribute("aria-label", "Text size in points");
+      sz.addEventListener("input", () => {
+        const v = +sz.value; if (!(v >= 6 && v <= 40)) return;
+        o.size = v; layoutText(o); clampObj(o); layoutText(o); drawLayer();
+      });
+      sizeRow.append(sl, sz);
+
       const alignRow = document.createElement("div"); alignRow.className = "proprow";
       const al = document.createElement("span"); al.className = "muted"; al.textContent = "Align";
       alignRow.appendChild(al);
       [["left", "Align left", "M4 6h16M4 12h10M4 18h13"], ["center", "Align centre", "M4 6h16M7 12h10M5.5 18h13"], ["right", "Align right", "M4 6h16M10 12h10M7 18h13"]].forEach(([v, label, path]) => {
         const bt = document.createElement("button");
-        bt.type = "button"; bt.className = "btn icon alignbtn" + ((o.align || "left") === v ? " armed" : ""); bt.dataset.align = v;
-        bt.setAttribute("aria-label", label); bt.setAttribute("aria-pressed", (o.align || "left") === v ? "true" : "false"); bt.title = label;
+        bt.type = "button"; bt.className = "btn icon alignbtn"; bt.dataset.align = v;
+        bt.setAttribute("aria-label", label); bt.title = label;
         bt.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="' + path + '"/></svg>';
-        bt.addEventListener("click", () => { o.align = v; box.dataset.obj = ""; drawLayer(); editUi(); });
+        bt.addEventListener("click", () => { o.align = v; syncProps(o); drawLayer(); });
         alignRow.appendChild(bt);
       });
-      box.append(ta, warn, fontRow, size, alignRow, colorChips(o));
-      warn.hidden = !cleanText(o.raw).bad;
+      const warn = document.createElement("div"); warn.className = "warnline"; warn.id = "ep-warn"; warn.hidden = true;
+      warn.textContent = "Some characters can't be used in PDF text and were replaced with ?.";
+      box.append(fontRow, sizeRow, alignRow, colorChips(o), warn);
     } else if (o.type === "check" || o.type === "cross" || o.type === "box") {
       box.appendChild(colorChips(o));
     } else if (o.type === "white") {
-      const n = document.createElement("div"); n.className = "warnline";
-      n.textContent = "Covers content visually only. The text underneath can still be selected and copied.";
+      const n = document.createElement("span"); n.className = "muted";
+      n.textContent = "Covers content visually only; the text underneath can still be copied.";
       box.appendChild(n);
     }
+    // done with this item: the controls go and the item stays on the page
+    const done = document.createElement("button");
+    done.type = "button"; done.className = "btn propdone"; done.textContent = "Done";
+    done.title = "Finish with this item (Esc)";
+    done.addEventListener("click", () => { ed.sel = null; ed.editObj = null; drawLayer(); editUi(); });
+    box.appendChild(done);
+    syncProps(o);
   }
 
   function fieldPage(f){ return f.widgets.length ? f.widgets[0].page : -1; }
@@ -1831,7 +1881,7 @@
     // Text editing happens on the page and in the ribbon, so the side panel only opens for
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
-    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) ||
+    const needsProps = (annot && !$("sigbox").hidden) ||
                        (ed.mode === "form" && !ed.fpanelClosed && ed.fields.length > 0) || textPanelNeeded;
     // contextual panels float over the page edge instead of taking a column, so the page
     // keeps its width whether or not one is showing
@@ -2274,6 +2324,13 @@
     if ((e.key === "Delete" || e.key === "Backspace") && ed.lockedSel &&
         !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) {
       e.preventDefault(); deleteLocked();
+    }
+  });
+  document.addEventListener("keydown", e => {
+    if (activeTool !== "document" || ed.mode !== "annotate" || ed.sel === null || ed.editObj !== null) return;
+    const o = ed.objs.find(x => x.id === ed.sel);
+    if (e.key === "Enter" && o && o.type === "text" && !/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test((document.activeElement || {}).tagName || "")) {
+      e.preventDefault(); startObjEdit(o.id);
     }
   });
   $("tx-text").addEventListener("input", stageTextEdit);
@@ -3778,7 +3835,6 @@
     }
     if (ed.lockedSel) { ed.lockedSel = null; ed.lockedAlso = []; }
     if (ed.mode === "form") { ed.fpanelClosed = true; ed.fsel = -1; }
-    if (ed.sel !== null && narrowScreen()) ed.sel = null;           // the object's controls live here only on a phone
     drawLayer(); editUi();
   }
   $("ctl-close").addEventListener("click", closeSidePanel);

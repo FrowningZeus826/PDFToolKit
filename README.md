@@ -41,6 +41,13 @@ matches are highlighted on the page, Enter and Shift+Enter step through them acr
 the count says where you are. It reads the same text layer the page is drawn from, so a scan has
 nothing to search until OCR has run.
 
+Text added with **Add to page** is typed on the page itself: a new box takes the typing at once, and
+double-clicking a box (or pressing Enter on it) types in it again. While an item is selected its
+controls (font, size, alignment, colour, Done) take the place of the tool buttons in the ribbon, so
+the ribbon never changes height and there is no popout over the page. Delete an item with the X on
+its corner or the Delete key; Escape or Done finishes with it. An empty text box is dropped when you
+click away.
+
 Save and Undo are icons in the header, next to the file's name and what has changed (Ctrl+S
 downloads what is open), so no row of the page is spent on them.
 
