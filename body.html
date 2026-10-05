@@ -151,10 +151,13 @@
             <span class="ribbon-sep"></span>
             <div class="ribbon-group" role="group" aria-label="Text">
               <span class="ribbon-title">Text</span>
-              <label class="ribbon-field" for="rb-font">Font <select id="rb-font" aria-label="Font"></select></label>
-              <label class="ribbon-field" for="rb-size">Size <input type="number" id="rb-size" min="4" max="96" step="0.5" aria-label="Text size"></label>
+              <label class="ribbon-field" for="rb-font" title="Font"><select id="rb-font" aria-label="Font"></select></label>
+              <label class="ribbon-field" for="rb-size" title="Text size"><input type="number" id="rb-size" min="4" max="96" step="0.5" aria-label="Text size"></label>
             </div>
-            <span class="ribbon-sep"></span>
+            <div class="ribbon-group" role="group" aria-label="Text color">
+              <span class="ribbon-title">Color</span>
+              <span class="colorrow" id="rb-colors"></span>
+            </div>
             <div class="ribbon-group" role="group" aria-label="Alignment">
               <span class="ribbon-title">Align</span>
               <button class="btn icon" id="tx-al-left" data-align="left" aria-pressed="true" title="Align left" aria-label="Align left" disabled><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></button>

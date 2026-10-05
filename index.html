@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-7bt1O7g2HL3IUecFIt2UaITxaXY7PhJZo7ArFc/ffNc=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-FaYx3kCd8afdcEfbSYheFoyZAUWhYtPIPHpmU3T5C9U=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -227,6 +227,13 @@
   .colorchip { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
   .colorchip { width: 16px; height: 16px; border-width: 1px; }
   .colorrow { gap: 3px; flex-wrap: nowrap; }
+  #rb-colors { display: inline-flex; align-items: center; }
+  .colorbtn { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px 8px; }
+  .colorbtn .colorA { font-weight: 700; font-size: 14px; line-height: 14px; }
+  .colorbtn .colorbar { width: 16px; height: 3px; border-radius: 1px; }
+  .colorpop { position: fixed; z-index: 60; display: flex; align-items: center; gap: 5px; padding: 7px 9px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  .colorpop[hidden] { display: none; }
+  .colorpop .colorchip { width: 20px; height: 20px; }
   .colorpick { width: 22px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
   .colorchip.active { box-shadow: 0 0 0 2px var(--gold-dim); }
   .fnav { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
@@ -412,14 +419,14 @@
   .ribbon-sep { width: 1px; height: 22px; background: var(--line); }
   .ribbon-field { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); }
   .ribbon-field select { min-width: 110px; max-width: 140px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
-  #rb-font { width: 132px; min-width: 132px; max-width: 132px; }     /* fixed: longer names must not widen the row and push the ribbon taller */
+  #rb-font { width: 176px; min-width: 176px; max-width: 176px; text-overflow: ellipsis; }     /* fixed: longer names must not widen the row and push the ribbon taller */
   .ribbon-field input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
   .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; line-height: 1.4; }
   .ribbon-note.warn { color: var(--bad); }
   @media (max-width: 640px) { .ribbon-sep { display: none; } .rpane { gap: 8px 10px; } }
   .groupctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
-  .groupctl input[type=range] { width: 70px; }
-  .groupctl span { min-width: 48px; }
+  .groupctl input[type=range] { width: 56px; }
+  .groupctl span { min-width: 44px; }
   .trun.alongside { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.12); }
   .trun.quiet { background: transparent; outline-color: transparent; }
   .trun.quiet:hover { background: rgba(46,111,216,0.13); outline: 1px solid rgba(46,111,216,0.35); }
@@ -719,10 +726,13 @@
             <span class="ribbon-sep"></span>
             <div class="ribbon-group" role="group" aria-label="Text">
               <span class="ribbon-title">Text</span>
-              <label class="ribbon-field" for="rb-font">Font <select id="rb-font" aria-label="Font"></select></label>
-              <label class="ribbon-field" for="rb-size">Size <input type="number" id="rb-size" min="4" max="96" step="0.5" aria-label="Text size"></label>
+              <label class="ribbon-field" for="rb-font" title="Font"><select id="rb-font" aria-label="Font"></select></label>
+              <label class="ribbon-field" for="rb-size" title="Text size"><input type="number" id="rb-size" min="4" max="96" step="0.5" aria-label="Text size"></label>
             </div>
-            <span class="ribbon-sep"></span>
+            <div class="ribbon-group" role="group" aria-label="Text color">
+              <span class="ribbon-title">Color</span>
+              <span class="colorrow" id="rb-colors"></span>
+            </div>
             <div class="ribbon-group" role="group" aria-label="Alignment">
               <span class="ribbon-title">Align</span>
               <button class="btn icon" id="tx-al-left" data-align="left" aria-pressed="true" title="Align left" aria-label="Align left" disabled><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h10M4 18h13"/></svg></button>
@@ -3643,6 +3653,7 @@ else if (typeof exports === 'object')
     if (!sel) return;
     const b = ed.tsel !== null && ed.blocks ? ed.blocks[ed.tsel] : null;
     sel.disabled = size.disabled = !b;
+    syncRibbonColors(b, !!b);
     if (!b) {
       document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => { btn.disabled = true; btn.setAttribute("aria-pressed", "false"); btn.classList.remove("armed"); });
       note.textContent = ""; return;          // the status line below the page says how to start; a note here would make the ribbon taller
@@ -3654,7 +3665,7 @@ else if (typeof exports === 'object')
     if (!built) {
       sel.innerHTML = "";
       const dinfo = docFontFor(b);
-      if (dinfo && dinfo.usable) sel.appendChild(new Option("Match the document", "doc"));
+      if (dinfo && dinfo.usable) sel.appendChild(new Option(dinfo.baseFont ? "Document: " + dinfo.baseFont : "Match the document", "doc"));
       [["doc:bold", "Document bold"], ["doc:italic", "Document italic"],
        ["doc:bolditalic", "Document bold italic"], ["doc:regular", "Document regular"]]
         .forEach(([v, label]) => { if (docSiblingFor(b, v.slice(4))) sel.appendChild(new Option(label, v)); });
@@ -3666,6 +3677,7 @@ else if (typeof exports === 'object')
       btn.disabled = false; btn.setAttribute("aria-pressed", on ? "true" : "false"); btn.classList.toggle("armed", on);
     });
     sel.value = want;
+    sel.title = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : "";
     if (document.activeElement !== size) size.value = String(Math.round((e.size || b.size) * 10) / 10);
     const e2 = ed.textEdits.get(ed.tsel) || {};
     const lines = (e2.text != null ? e2.text : b.text).split("\n").length;
@@ -3691,6 +3703,54 @@ else if (typeof exports === 'object')
     blockEdit(ed.tsel, { align: btn.dataset.align });
     drawLayer(); editUi();
   }));
+  const blockInk = e => "#" + (e.fill || [0, 0, 0]).map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
+  function ribbonColors(){
+    const host = $("rb-colors"); if (!host || host.dataset.built) return;
+    host.dataset.built = "1";
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "btn icon colorbtn"; btn.id = "rb-colorbtn";
+    btn.title = "Text color"; btn.setAttribute("aria-label", "Text color"); btn.setAttribute("aria-haspopup", "true"); btn.setAttribute("aria-expanded", "false");
+    btn.innerHTML = '<span class="colorA">A</span><span class="colorbar" id="rb-colorbar"></span>';
+    const pop = document.createElement("div");
+    pop.className = "colorpop"; pop.id = "rb-colorpop"; pop.hidden = true;
+    Object.entries(PALETTE).forEach(([hex, name]) => {
+      const bt = document.createElement("button");
+      bt.type = "button"; bt.className = "colorchip"; bt.dataset.hex = hex; bt.style.background = hex;
+      bt.title = name; bt.setAttribute("aria-label", name);
+      bt.addEventListener("click", () => { setBlockInk(hex); closePop(); });
+      pop.appendChild(bt);
+    });
+    const pick = document.createElement("input");
+    pick.type = "color"; pick.className = "colorpick"; pick.id = "rb-color"; pick.title = "More colors\u2026"; pick.setAttribute("aria-label", "Custom text color");
+    pick.addEventListener("input", () => setBlockInk(pick.value));
+    pop.appendChild(pick);
+    const closePop = () => { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+    btn.addEventListener("click", () => {
+      if (!pop.hidden) { closePop(); return; }
+      const r = btn.getBoundingClientRect();
+      pop.hidden = false; pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + "px"; pop.style.top = (r.bottom + 4) + "px";
+      btn.setAttribute("aria-expanded", "true");
+    });
+    document.addEventListener("pointerdown", ev => { if (!pop.hidden && !pop.contains(ev.target) && !btn.contains(ev.target)) closePop(); });
+    document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !pop.hidden) { closePop(); btn.focus(); } });
+    host.append(btn, pop);
+  }
+  function setBlockInk(hex){
+    if (ed.tsel === null) return;
+    const c = inkRgb(hex);
+    blockEdit(ed.tsel, { fill: c });
+    drawLayer(); editUi();
+  }
+  function syncRibbonColors(b, on){
+    const host = $("rb-colors"); if (!host) return;
+    ribbonColors();
+    const cur = b ? blockInk(ed.textEdits.get(ed.tsel) || b) : "";
+    host.querySelectorAll(".colorchip").forEach(c => c.classList.toggle("active", on && c.dataset.hex.toLowerCase() === cur.toLowerCase()));
+    $("rb-colorbtn").disabled = !on;
+    $("rb-colorbar").style.background = on ? cur : "transparent";
+    const pick = $("rb-color"); if (pick && on) pick.value = cur.toLowerCase();
+    if (!on) { const pop = $("rb-colorpop"); if (pop) pop.hidden = true; }
+  }
   { const sel = $("rb-font"), size = $("rb-size");
     if (sel) sel.addEventListener("change", () => { if (ed.tsel !== null) { blockEdit(ed.tsel, blockFontFields(ed.blocks[ed.tsel], sel.value)); drawLayer(); editUi(); } });
     if (size) size.addEventListener("input", () => { if (ed.tsel !== null && +size.value > 0) { blockEdit(ed.tsel, { size: +size.value }); drawLayer(); editUi(); } }); }
@@ -5056,8 +5116,12 @@ else if (typeof exports === 'object')
     const typed = (e.text || "").split("\n");
     const size = e.size || b.size;
     const width = e.width || b.w;
+    // measure with the font the save will use, so the lines break where they will in the file
+    const dInfoM = e.docFontCodes && /^doc/.test(e.fontName || "") && e.docFontCodes.usable && [...(e.text || "").replace(/\n/g, "")].every(ch => ch === " " || e.docFontCodes.toCode.has(ch)) ? e.docFontCodes : null;
+    const stdM = stdFonts[e.fontName] || helv;
+    const meas = dInfoM ? (t, sz) => widthWithDocFont(dInfoM, t, sz) : stdM ? (t, sz) => stdM.widthOfTextAtSize(t, sz) : null;
     const fits = !e.resized && typed.length === b.lineBoxes.length &&
-      (!helv || typed.every((ln, k) => helv.widthOfTextAtSize(ln, size) <= Math.max(b.lineBoxes[k].w, width) * 1.02));
+      (!meas || typed.every((ln, k) => meas(ln, size) <= Math.max(b.lineBoxes[k].w, width) * 1.02));
     const places = [];
     // While someone types on the page, the lines they see are the text; laying them out a
     // second time with different metrics would move words between lines and drop spaces.
@@ -5069,11 +5133,11 @@ else if (typeof exports === 'object')
     else {
       const lines = [];
       typed.forEach(t => {
-        if (!helv) { lines.push(t); return; }
+        if (!meas) { lines.push(t); return; }
         let line = "";
         for (const word of t.split(/\s+/).filter(Boolean)) {
           const cand = line ? line + " " + word : word;
-          if (helv.widthOfTextAtSize(cand, size) <= Math.max(size, width) || !line) line = cand;
+          if (meas(cand, size) <= Math.max(size, width) || !line) line = cand;
           else { lines.push(line); line = word; }
         }
         lines.push(line);

@@ -217,6 +217,13 @@
   .colorchip { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--panel); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
   .colorchip { width: 16px; height: 16px; border-width: 1px; }
   .colorrow { gap: 3px; flex-wrap: nowrap; }
+  #rb-colors { display: inline-flex; align-items: center; }
+  .colorbtn { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; padding: 2px 8px; }
+  .colorbtn .colorA { font-weight: 700; font-size: 14px; line-height: 14px; }
+  .colorbtn .colorbar { width: 16px; height: 3px; border-radius: 1px; }
+  .colorpop { position: fixed; z-index: 60; display: flex; align-items: center; gap: 5px; padding: 7px 9px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.25); }
+  .colorpop[hidden] { display: none; }
+  .colorpop .colorchip { width: 20px; height: 20px; }
   .colorpick { width: 22px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; background: none; cursor: pointer; }
   .colorchip.active { box-shadow: 0 0 0 2px var(--gold-dim); }
   .fnav { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; }
@@ -402,14 +409,14 @@
   .ribbon-sep { width: 1px; height: 22px; background: var(--line); }
   .ribbon-field { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); }
   .ribbon-field select { min-width: 110px; max-width: 140px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
-  #rb-font { width: 132px; min-width: 132px; max-width: 132px; }     /* fixed: longer names must not widen the row and push the ribbon taller */
+  #rb-font { width: 176px; min-width: 176px; max-width: 176px; text-overflow: ellipsis; }     /* fixed: longer names must not widen the row and push the ribbon taller */
   .ribbon-field input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
   .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; line-height: 1.4; }
   .ribbon-note.warn { color: var(--bad); }
   @media (max-width: 640px) { .ribbon-sep { display: none; } .rpane { gap: 8px 10px; } }
   .groupctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
-  .groupctl input[type=range] { width: 70px; }
-  .groupctl span { min-width: 48px; }
+  .groupctl input[type=range] { width: 56px; }
+  .groupctl span { min-width: 44px; }
   .trun.alongside { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.12); }
   .trun.quiet { background: transparent; outline-color: transparent; }
   .trun.quiet:hover { background: rgba(46,111,216,0.13); outline: 1px solid rgba(46,111,216,0.35); }
