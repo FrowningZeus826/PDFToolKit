@@ -26,6 +26,16 @@ Where the document's own font can be reused, it is — including its bold or ita
 are handled through the encoding they declare, which covers most older documents. Text that
 can't be edited safely is marked and says why when you tap it.
 
+### One ribbon
+
+Everything on the Document tab lives in a single ribbon, like a word processor's: **Add to page**,
+**Fill form**, **Edit text**, **Redact** and **Whole document** are its tabs, and each tab shows
+only its own controls. Page navigation, zoom and Apply sit beside the tabs. The page takes the
+full width; anything contextual (the signature builder, a selected object's properties, a form
+field) floats over its edge instead of taking a column. For reading, the arrow at the end of the
+tab row tucks the ribbon away (double-click the open tab does the same); picking a tab brings it
+back. On a phone it starts tucked away so the document comes first.
+
 ### Finding your way around
 
 The page comes first. Editable blocks are not outlined until you point at one; a toggle in
