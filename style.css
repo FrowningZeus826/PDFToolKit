@@ -398,6 +398,7 @@
   .trun.alongside { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.12); }
   .trun.quiet { background: transparent; outline-color: transparent; }
   .trun.quiet:hover { background: rgba(46,111,216,0.13); outline: 1px solid rgba(46,111,216,0.35); }
+  .trun.locked.quiet { background: transparent; outline-color: transparent; }   /* declared after .locked below would lose, so it is more specific */
   .trun.locked.quiet:hover { background: rgba(0,0,0,0.05); outline: 1px dashed rgba(0,0,0,0.3); }
   .trun.block.shared { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.10); }
   .trun.block.mergeable { outline: 2px dashed var(--gold-dim); background: rgba(255,182,18,0.12); cursor: copy; }

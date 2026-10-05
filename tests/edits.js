@@ -253,6 +253,33 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      `${before} -> ${after}`); }
  await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000);
 
+ // ---- one operator reported as several pieces (Acrobat Distiller style), and text that stays locked ----
+ await openText('split-ops.pdf');
+ { const info=await p.evaluate(()=>({blocks:document.querySelectorAll('.trun.block').length, locked:document.querySelectorAll('.trun.locked').length}));
+   check('split operators: a line the reader splits into words is editable, not locked', info.blocks>=2 && info.locked===1, JSON.stringify(info));
+   // find the block that holds the title
+   let ti=-1; for (let i=0;i<info.blocks;i++){ await pickBlock(i); const t=await p.$eval('#tx-text',e=>e.value).catch(()=>''); if (t.includes('Introduction to Programming')) { ti=i; break; } }
+   check('split operators: the title is one block with both its lines', ti>=0 && (await p.$eval('#tx-text',e=>e.value))==='An Introduction to Programming\nwith Threads', JSON.stringify(await p.$eval('#tx-text',e=>e.value).catch(()=>'')));
+   await p.$eval('#tx-text',e=>{e.value=e.value.replace('Programming','Concurrency'); e.dispatchEvent(new Event('input'));}); await sleep(600);
+   await H.applyAndDownload(p,'#edit-go'); const dd=await H.takeDownloads(p,1); fs.writeFileSync('split-edited.pdf',dd[0].buf);
+   const tt=execSync('pdftotext split-edited.pdf -').toString().replace(/\s+/g,' ');
+   check('split operators: the edit is saved and the old words are gone', tt.includes('An Introduction to Concurrency') && !tt.includes('Programming'), tt.slice(0,120));
+   check('split operators: nothing else on the page was lost', ['with Threads','ordinary paragraph of body text','written with word spacing','Left cell','Right cell'].every(k=>tt.includes(k)), tt);
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000); }
+ // what has to stay locked is not drawn gray unless "Show all blocks" is on
+ await openText('split-ops.pdf');
+ { const bg=()=>p.evaluate(()=>{const e=document.querySelector('.trun.locked'); const cs=getComputedStyle(e); return {bg:cs.backgroundColor, outline:cs.outlineColor, quiet:e.classList.contains('quiet')};});
+   const setAll=async on=>{ const cur=await p.$eval('#tx-showall',e=>e.getAttribute('aria-pressed')==='true'); if (cur!==on) { await p.evaluate(()=>document.getElementById('tx-showall').click()); await sleep(450); } };
+   await setAll(false);
+   const off=await bg();
+   check('locked text: with Show all off it is not gray (it only shows when pointed at)', off.quiet && off.bg==='rgba(0, 0, 0, 0)', JSON.stringify(off));
+   await setAll(true);
+   const on=await bg();
+   check('locked text: with Show all on it is outlined like the rest', !on.quiet && on.bg!=='rgba(0, 0, 0, 0)', JSON.stringify(on));
+   await setAll(false);
+   await p.evaluate(()=>{const e=document.querySelector('.trun.locked'); e.dispatchEvent(new MouseEvent('click',{bubbles:true}));}); await sleep(500);
+   check('locked text: it can still be selected, and says why it cannot be rewritten', !(await p.$eval('#tx-locked',e=>e.hidden)) && (await txt(p,'#tx-locked-why')).length>20, await txt(p,'#tx-locked-why')); }
+
  // ---- the ribbon: the controls stay above the page instead of in a side panel ----
  await openText('letter.pdf');
  { const ids=await p.evaluate(()=>[...document.querySelectorAll('#tx-ribbon button, #tx-ribbon select, #tx-ribbon input')].map(e=>e.id));

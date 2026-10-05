@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-vJLkHUmQVu6mxbMlZSEHmA9FkjTFtzIk/THOtWwNC1c=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-w2PL2J2Q7G1UGTxeYmm+/Y2/jOoZlXu3HQ+CBMtvkqM=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -408,6 +408,7 @@
   .trun.alongside { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.12); }
   .trun.quiet { background: transparent; outline-color: transparent; }
   .trun.quiet:hover { background: rgba(46,111,216,0.13); outline: 1px solid rgba(46,111,216,0.35); }
+  .trun.locked.quiet { background: transparent; outline-color: transparent; }   /* declared after .locked below would lose, so it is more specific */
   .trun.locked.quiet:hover { background: rgba(0,0,0,0.05); outline: 1px dashed rgba(0,0,0,0.3); }
   .trun.block.shared { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.10); }
   .trun.block.mergeable { outline: 2px dashed var(--gold-dim); background: rgba(255,182,18,0.12); cursor: copy; }
@@ -4423,6 +4424,7 @@ else if (typeof exports === 'object')
     // its place in that order and takes its position from the reader, which knows where the
     // text actually landed. Positioned operators re-synchronise the walk if it drifts.
     let cursor = 0;
+    const reach = new Map();                      // operator index -> right edge of the text seen from it so far
     const takeOps = (e, f, size) => {
       // A run that begins with a space is reported from after the space, so the operator
       // sits slightly to the left of where the line is said to start. The baseline must
@@ -4441,7 +4443,22 @@ else if (typeof exports === 'object')
         // on position anywhere in the stream
         const any = ops.findIndex(o => (o.located &&
           Math.abs(o.matrix[4] - e) < 0.6 && Math.abs(o.matrix[5] - f) < 0.6) || near(o, e, f));
-        if (any < 0) return null;
+        if (any < 0) {
+          // The reader can report one show operator as several pieces (it splits at spaces when
+          // word spacing is set). A piece that starts shortly after the right edge of text
+          // already seen from an operator, on the same baseline, is part of that operator.
+          const sz = size || 10; let share = -1;
+          reach.forEach((right, j) => {
+            const o = ops[j];
+            if (!o.located || Math.abs(o.matrix[5] - f) > 0.6 || e < o.matrix[4] - 0.6) return;
+            const gap = e - right;
+            if (gap > sz * 3 || gap < -1.5 * sz) return;
+            if (share < 0 || o.matrix[4] > ops[share].matrix[4]) share = j;
+          });
+          if (share < 0) return null;
+          const viaShare = [share]; viaShare.shared = true;      // matched as a continuation, not by its own position
+          return viaShare;
+        }
         start = any;
       }
       const out = [start];
@@ -4458,6 +4475,8 @@ else if (typeof exports === 'object')
       const idxs = takeOps(e, f, Math.hypot(a, b) || Math.hypot(c, d));
       const k = idxs ? idxs[0] : -1;
       const op = k < 0 ? null : ops[k];
+      const viaShare = !!(idxs && idxs.shared);
+      if (op) reach.set(k, Math.max(reach.has(k) ? reach.get(k) : -1e9, e + Math.abs(it.width)));
       const spans = [];
       if (op) {
         idxs.slice(1).forEach(j => { /* continuation pieces are collected below too */ });
@@ -4475,7 +4494,7 @@ else if (typeof exports === 'object')
             if (!onLine) break;
           }
           spans.push({ opStart: o.start, opEnd: o.end });
-          cursor = j + 1;
+          cursor = Math.max(cursor, j + 1);
         }
       }
       // Size and position come from pdf.js, which has already resolved every layer that
@@ -4493,7 +4512,7 @@ else if (typeof exports === 'object')
         : (ops.streams && ops.streams.size ? "form" : "unpositioned");
       runs.push({
         str: it.str, x: e, y: f, w: it.width, h: it.height || shown,
-        editable: !!op && trustworthy,
+        editable: !!op && trustworthy, primary: op ? op.start : null, viaShare,
         opStart: op ? op.start : null, opEnd: op ? op.end : null, spans,
         fontRes: op ? op.font : null, reason, stream: op ? op.stream || null : null,
         matrix: op ? op.matrix : null, fill: op ? op.fill : [0, 0, 0],
@@ -4524,15 +4543,19 @@ else if (typeof exports === 'object')
       const sameInk = !prev || !prev.fill || !r.fill ||
         (Math.abs(prev.fill[0] - r.fill[0]) < 0.02 && Math.abs(prev.fill[1] - r.fill[1]) < 0.02 &&
          Math.abs(prev.fill[2] - r.fill[2]) < 0.02);
+      // Pieces drawn by one operator must stay together whatever the grouping setting: editing
+      // one would delete the operator, and with it the others.
+      const sharesOp = !!prev && prev.editable && r.viaShare && prev.primary != null && prev.primary === r.primary;
       if (prev && prev.editable === r.editable && prev.stream === r.stream && sameInk &&
           Math.abs(prev.size - r.size) < 0.6 &&
           Math.abs(prev.y - r.y) < Math.max(0.5, size * 0.12)) {
         const gap = (r.x - (prev.x + prev.w)) / size;
-        if (gap <= grouping().join && gap > -1.5) {
+        if (sharesOp || (gap <= grouping().join && gap > -1.5)) {
           // a real space between the pieces, or none where the writer split mid-word
           prev.str += (gap >= 0.12 && !/\s$/.test(prev.str) && !/^\s/.test(r.str) ? " " : "") + r.str;
           prev.w = (r.x + r.w) - prev.x;
-          prev.spans = (prev.spans || []).concat(r.spans || []);
+          { const seen = new Set((prev.spans || []).map(s => s.opStart));
+            prev.spans = (prev.spans || []).concat((r.spans || []).filter(s => !seen.has(s.opStart))); }
           prev.h = Math.max(prev.h, r.h);
           if (prev.fontRes !== r.fontRes) prev.mixedFont = true;
           return;
