@@ -1846,7 +1846,7 @@
   function fillTextFonts(block){
     const sel = $("tx-font"), keep = sel.value;
     sel.innerHTML = "";
-    const info = ed.docFonts && block ? ed.docFonts.get(block.fontRes) : null;
+    const info = block ? docFontFor(block) : null;
     if (info && info.usable) {
       sel.appendChild(new Option("Match the document", "doc"));
       [["bold", "Match the document \u2014 Bold"], ["italic", "Match the document \u2014 Italic"],
@@ -1951,6 +1951,17 @@
 
   // Load what the page's own fonts can do. Used by the text editor, and by a new text box
   // that wants to match the document rather than approximate it.
+  // The table of the page's own fonts is keyed by resource name when text mode builds it and
+  // by "resource|stream" when the font menu for added text does. Anything that looks a font up
+  // for a block must accept either, or the document's font quietly stops being offered.
+  function docFontFor(b){
+    if (!ed.docFonts || !b || !b.fontRes) return null;
+    return ed.docFonts.get(b.fontRes + "|" + (b.stream || "")) || ed.docFonts.get(b.fontRes) || null;
+  }
+  function docSiblingFor(b, want){
+    if (!ed.docSiblings || !b || !b.fontRes) return null;
+    return ed.docSiblings.get(b.fontRes + "|" + (b.stream || "") + ":" + want) || ed.docSiblings.get(b.fontRes + ":" + want) || null;
+  }
   async function ensureDocFonts(){
     if (ed.docFonts && ed.docFonts.size) return;
     ed.docFonts = new Map(); ed.docSiblings = new Map();
@@ -2008,11 +2019,15 @@
   // Text we cannot rewrite can still be removed: removal only needs to know which
   // operators draw it. The catch is that one operator may draw more than the line pointed
   // at, so the full extent is shown before anything is deleted.
+  // The instructions that draw a piece of text: the ones matched to it, or failing that the one
+  // found for it by its baseline. Empty when the text is not drawn by any (a scan, outlines).
+  const lockSpans = r => (r.spans && r.spans.length ? r.spans : r.rmSpans) || [];
   function selectLocked(run){
     ed.tsel = null;
     ed.lockedSel = run;
-    const share = (ed.runs || []).filter(o => o !== run && o.spans && run.spans &&
-      o.spans.some(s1 => run.spans.some(s2 => s1.opStart === s2.opStart)));
+    const mine = lockSpans(run);
+    const share = (ed.runs || []).filter(o => o !== run &&
+      lockSpans(o).some(s1 => mine.some(s2 => s1.opStart != null && s1.opStart === s2.opStart)));
     ed.lockedAlso = share;
     drawLayer(); editUi();
     setStatus(editStatus, "info", (LOCK_REASON[run.reason] || LOCK_REASON.unpositioned) +
@@ -2021,10 +2036,10 @@
   function deleteLocked(){
     const run = ed.lockedSel;
     if (!run) return;
-    const spans = run.spans && run.spans.length ? run.spans : [{ opStart: run.opStart, opEnd: run.opEnd }];
-    if (!spans.length || spans[0].opStart == null) { setStatus(editStatus, "error", "This text can't be removed either: it isn't drawn as text on this page."); return; }
+    const spans = lockSpans(run).length ? lockSpans(run) : (run.opStart != null ? [{ opStart: run.opStart, opEnd: run.opEnd }] : []);
+    if (!spans.length || spans[0].opStart == null) { setStatus(editStatus, "error", NO_REMOVE); return; }
     const key = "locked:" + spans[0].opStart;
-    ed.textEdits.set(key, { page: ed.page, stream: run.stream || null, ops: spans, text: "",
+    ed.textEdits.set(key, { page: ed.page, stream: run.stream || run.rmStream || null, ops: spans, text: "",
       fontName: "doc", docFontRes: run.fontRes, size: run.size, fill: run.fill,
       x: run.x, top: run.y + run.h, width: run.w, leading: run.size * LINE,
       lineBoxes: [{ x: run.x, y: run.y, w: run.w }], moved: false, dx: 0, dy: 0 });
@@ -2044,16 +2059,17 @@
     if (!b) { note.textContent = "Select some text to change its font or size."; return; }
     const e = ed.textEdits.get(ed.tsel) || {};
     const want = e.fontName || fontDefaultFor(b);
-    const built = sel.dataset.forBlock === String(ed.tsel);
+    const offers = ed.tsel + ":" + (docFontFor(b) && docFontFor(b).usable ? 1 : 0) + ":" + ["bold", "italic", "bolditalic", "regular"].filter(w => docSiblingFor(b, w)).join(",");
+    const built = sel.dataset.forBlock === offers;
     if (!built) {
       sel.innerHTML = "";
-      const dinfo = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+      const dinfo = docFontFor(b);
       if (dinfo && dinfo.usable) sel.appendChild(new Option("Match the document", "doc"));
       [["doc:bold", "Document bold"], ["doc:italic", "Document italic"],
        ["doc:bolditalic", "Document bold italic"], ["doc:regular", "Document regular"]]
-        .forEach(([v, label]) => { if (ed.docSiblings && ed.docSiblings.get(b.fontRes + "|" + (b.stream || "") + ":" + v.slice(4))) sel.appendChild(new Option(label, v)); });
+        .forEach(([v, label]) => { if (docSiblingFor(b, v.slice(4))) sel.appendChild(new Option(label, v)); });
       TEXT_FONTS.forEach(([label, v]) => sel.appendChild(new Option(label, v)));
-      sel.dataset.forBlock = String(ed.tsel);
+      sel.dataset.forBlock = offers;
     }
     sel.value = want;
     if (document.activeElement !== size) size.value = String(Math.round((e.size || b.size) * 10) / 10);
@@ -2073,7 +2089,7 @@
     note.className = "ribbon-note" + (grew || (b.stream && ed.formPages && (ed.formPages.get(b.stream) || 1) > 1) ? " warn" : "");
   }
   function fontDefaultFor(b){
-    const dinfo = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+    const dinfo = docFontFor(b);
     return dinfo && dinfo.usable ? "doc" : StandardFonts.Helvetica;
   }
   { const sel = $("rb-font"), size = $("rb-size");
@@ -2087,8 +2103,10 @@
     if (locked) {
       const n = (ed.lockedAlso || []).length;
       $("tx-locked-why").textContent = LOCK_REASON[ed.lockedSel.reason] || LOCK_REASON.unpositioned;
-      $("tx-locked-extent").textContent = n
-        ? "Removing it also removes " + plural(n, "other line") + " drawn by the same instruction \u2014 shown outlined on the page."
+      const removable = lockSpans(ed.lockedSel).length > 0 || ed.lockedSel.opStart != null;
+      $("tx-locked-go").disabled = !removable;
+      $("tx-locked-extent").textContent = !removable ? NO_REMOVE
+        : n ? "Removing it also removes " + plural(n, "other line") + " drawn by the same instruction \u2014 shown outlined on the page."
         : "Nothing else is drawn by the same instruction, so only this goes.";
     }
     $("tx-empty").hidden = !!has || locked;
@@ -2098,7 +2116,7 @@
     if (document.activeElement !== $("tx-text")) $("tx-text").value = e ? e.text : b.text;
     fillTextFonts(b);
     if (e) $("tx-font").value = e.fontName;
-    const dinfo = ed.docFonts && ed.docFonts.get(b.fontRes);
+    const dinfo = docFontFor(b);
     const usingDoc = $("tx-font").value.indexOf("doc") === 0;
     const missing = usingDoc && dinfo ? [...new Set(($("tx-text").value || "").replace(/\n/g, ""))]
       .filter(ch => ch.trim() && !activeDocFont(b).toCode.has(ch)) : [];
@@ -2162,7 +2180,7 @@
   }
   function activeDocFont(b){
     const v = $("tx-font").value;
-    if (v === "doc") return ed.docFonts.get(b.fontRes);
+    if (v === "doc") return docFontFor(b);
     if (v.indexOf("doc:") === 0) return ed.docSiblings.get(b.fontRes + ":" + v.slice(4));
     return null;
   }
@@ -2172,7 +2190,7 @@
     const b = ed.blocks[ed.tsel];
     const value = $("tx-text").value, font = $("tx-font").value, size = +$("tx-size").value || b.size;
     const e = ed.textEdits.get(ed.tsel);
-    const dflt = (ed.docFonts && ed.docFonts.get(b.fontRes) || {}).usable ? "doc" : StandardFonts.Helvetica;
+    const dflt = (docFontFor(b) || {}).usable ? "doc" : StandardFonts.Helvetica;
     const unchanged = value === b.text && font === dflt && Math.abs(size - b.size) < 0.05 && !(e && e.moved) && !(e && e.resized);
     if (unchanged) ed.textEdits.delete(ed.tsel);
     else {
@@ -3048,9 +3066,22 @@
             if (gap > sz * 3 || gap < -1.5 * sz) return;
             if (share < 0 || o.matrix[4] > ops[share].matrix[4]) share = j;
           });
-          if (share < 0) return null;
-          const viaShare = [share]; viaShare.shared = true;      // matched as a continuation, not by its own position
-          return viaShare;
+          if (share >= 0) {
+            const viaShare = [share]; viaShare.shared = true;    // matched as a continuation, not by its own position
+            return viaShare;
+          }
+          // Pieces many ems apart (table cells, indented code) are not safe to rewrite, but the
+          // operator that draws them is still the nearest one on this baseline that starts at or
+          // before the piece, and that is all removal needs to know.
+          let near = -1;
+          reach.forEach((right, j) => {
+            const o = ops[j];
+            if (!o.located || Math.abs(o.matrix[5] - f) > 0.6 || e < o.matrix[4] - 0.6) return;
+            if (near < 0 || o.matrix[4] > ops[near].matrix[4]) near = j;
+          });
+          if (near < 0) return null;
+          const removalOnly = [near]; removalOnly.removalOnly = true;
+          return removalOnly;
         }
         start = any;
       }
@@ -3067,7 +3098,8 @@
       // the remainder of the line on the page under the replacement.
       const idxs = takeOps(e, f, Math.hypot(a, b) || Math.hypot(c, d));
       const k = idxs ? idxs[0] : -1;
-      const op = k < 0 ? null : ops[k];
+      const rmOp = idxs && idxs.removalOnly ? ops[k] : null;       // found for removal only, never for editing
+      const op = k < 0 || rmOp ? null : ops[k];
       const viaShare = !!(idxs && idxs.shared);
       if (op) reach.set(k, Math.max(reach.has(k) ? reach.get(k) : -1e9, e + Math.abs(it.width)));
       const spans = [];
@@ -3106,6 +3138,7 @@
       runs.push({
         str: it.str, x: e, y: f, w: it.width, h: it.height || shown,
         editable: !!op && trustworthy, primary: op ? op.start : null, viaShare,
+        rmSpans: rmOp ? [{ opStart: rmOp.start, opEnd: rmOp.end }] : null, rmStream: rmOp ? rmOp.stream || null : null,
         opStart: op ? op.start : null, opEnd: op ? op.end : null, spans,
         fontRes: op ? op.font : null, reason, stream: op ? op.stream || null : null,
         matrix: op ? op.matrix : null, fill: op ? op.fill : [0, 0, 0],
@@ -3296,7 +3329,7 @@
     const e0 = ed.textEdits.get(i) || {};
     const width = e0.width || b.w;
     const size = e0.size || b.size;
-    const info = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+    const info = docFontFor(b);
     const measure = (t, sz) => info && info.usable ? widthWithDocFont(info, t, sz) : t.length * sz * 0.5;
     const overflowing = lines.length > 1 && lines.some(l => measure(l.replace(/\s+$/, ""), size) > width * 1.02);
     let text = lines.join("\n");
@@ -3450,6 +3483,7 @@
     });
   }
 
+  const NO_REMOVE = "This can't be removed either: it isn't drawn as text on this page (a scan, or letters turned into outlines). Use Redact to black it out instead.";
   const LOCK_REASON = {
     form: "This text is drawn inside a reusable block \u2014 a header, footer or letterhead that the page stamps in from elsewhere. Editing it would change every page that uses it, so it is left alone for now.",
     unpositioned: "This line's position isn't stated in the file; it continues from wherever the previous text ended, so its exact place can't be worked out reliably. Rewriting it could put the text in the wrong spot.",

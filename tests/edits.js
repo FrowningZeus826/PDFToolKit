@@ -260,6 +260,9 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    // find the block that holds the title
    let ti=-1; for (let i=0;i<info.blocks;i++){ await pickBlock(i); const t=await p.$eval('#tx-text',e=>e.value).catch(()=>''); if (t.includes('Introduction to Programming')) { ti=i; break; } }
    check('split operators: the title is one block with both its lines', ti>=0 && (await p.$eval('#tx-text',e=>e.value))==='An Introduction to Programming\nwith Threads', JSON.stringify(await p.$eval('#tx-text',e=>e.value).catch(()=>'')));
+   { const fo=await p.$$eval('#rb-font option',os=>os.map(o=>o.value)); const fv=await p.$eval('#rb-font',e=>e.value);
+     check('document font: the ribbon offers the paper\'s own font and uses it by default', fo.includes('doc') && fv==='doc', fo.join()+' / selected '+fv);
+     check('document font: its other weights are offered too', fo.some(v=>/^doc:/.test(v)), fo.join()); }
    await p.$eval('#tx-text',e=>{e.value=e.value.replace('Programming','Concurrency'); e.dispatchEvent(new Event('input'));}); await sleep(600);
    await H.applyAndDownload(p,'#edit-go'); const dd=await H.takeDownloads(p,1); fs.writeFileSync('split-edited.pdf',dd[0].buf);
    const tt=execSync('pdftotext split-edited.pdf -').toString().replace(/\s+/g,' ');
@@ -279,6 +282,14 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    await setAll(false);
    await p.evaluate(()=>{const e=document.querySelector('.trun.locked'); e.dispatchEvent(new MouseEvent('click',{bubbles:true}));}); await sleep(500);
    check('locked text: it can still be selected, and says why it cannot be rewritten', !(await p.$eval('#tx-locked',e=>e.hidden)) && (await txt(p,'#tx-locked-why')).length>20, await txt(p,'#tx-locked-why')); }
+   // the piece was found by its baseline only (a far-apart cell inside one instruction): removal still works
+   { check('locked text: Remove it is available and warns what goes with it', !(await p.$eval('#tx-locked-go',e=>e.disabled)) && /also removes 1 other line/.test(await txt(p,'#tx-locked-extent')), await txt(p,'#tx-locked-extent'));
+     await p.click('#tx-locked-go'); await sleep(600);
+     check('locked text: Remove it stages the removal', /1 text edit/.test(await txt(p,'#edit-summary')), await txt(p,'#edit-summary'));
+     await H.applyAndDownload(p,'#edit-go'); const rd=await H.takeDownloads(p,1); fs.writeFileSync('split-removed.pdf',rd[0].buf);
+     const rt=execSync('pdftotext split-removed.pdf -').toString().replace(/\s+/g,' ');
+     check('locked text: it is gone from the saved file and the rest of the page is untouched', !rt.includes('Right cell') && !rt.includes('Left cell') && rt.includes('An Introduction to Programming') && rt.includes('ordinary paragraph'), rt);
+     await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(1800); }
 
  // ---- the ribbon: the controls stay above the page instead of in a side panel ----
  await openText('letter.pdf');
