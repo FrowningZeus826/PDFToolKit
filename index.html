@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-XK9ry/mgtBOMHYj8wr9LEwRcCuDX6+JlGaW29tpixsg=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-FaYx3kCd8afdcEfbSYheFoyZAUWhYtPIPHpmU3T5C9U=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -3438,7 +3438,7 @@ else if (typeof exports === 'object')
     sel.innerHTML = "";
     const info = block ? docFontFor(block) : null;
     if (info && info.usable) {
-      sel.appendChild(new Option(dinfo.baseFont ? "Document: " + dinfo.baseFont : "Match the document", "doc"));
+      sel.appendChild(new Option("Match the document", "doc"));
       [["bold", "Match the document \u2014 Bold"], ["italic", "Match the document \u2014 Italic"],
        ["bolditalic", "Match the document \u2014 Bold Italic"], ["regular", "Match the document \u2014 Regular"]]
         .forEach(([want, label]) => { if (ed.docSiblings && ed.docSiblings.get(block.fontRes + ":" + want)) sel.appendChild(new Option(label, "doc:" + want)); });
@@ -3665,7 +3665,7 @@ else if (typeof exports === 'object')
     if (!built) {
       sel.innerHTML = "";
       const dinfo = docFontFor(b);
-      if (dinfo && dinfo.usable) sel.appendChild(new Option("Match the document", "doc"));
+      if (dinfo && dinfo.usable) sel.appendChild(new Option(dinfo.baseFont ? "Document: " + dinfo.baseFont : "Match the document", "doc"));
       [["doc:bold", "Document bold"], ["doc:italic", "Document italic"],
        ["doc:bolditalic", "Document bold italic"], ["doc:regular", "Document regular"]]
         .forEach(([v, label]) => { if (docSiblingFor(b, v.slice(4))) sel.appendChild(new Option(label, v)); });

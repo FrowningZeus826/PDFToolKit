@@ -1997,7 +1997,7 @@
     sel.innerHTML = "";
     const info = block ? docFontFor(block) : null;
     if (info && info.usable) {
-      sel.appendChild(new Option(dinfo.baseFont ? "Document: " + dinfo.baseFont : "Match the document", "doc"));
+      sel.appendChild(new Option("Match the document", "doc"));
       [["bold", "Match the document \u2014 Bold"], ["italic", "Match the document \u2014 Italic"],
        ["bolditalic", "Match the document \u2014 Bold Italic"], ["regular", "Match the document \u2014 Regular"]]
         .forEach(([want, label]) => { if (ed.docSiblings && ed.docSiblings.get(block.fontRes + ":" + want)) sel.appendChild(new Option(label, "doc:" + want)); });
@@ -2224,7 +2224,7 @@
     if (!built) {
       sel.innerHTML = "";
       const dinfo = docFontFor(b);
-      if (dinfo && dinfo.usable) sel.appendChild(new Option("Match the document", "doc"));
+      if (dinfo && dinfo.usable) sel.appendChild(new Option(dinfo.baseFont ? "Document: " + dinfo.baseFont : "Match the document", "doc"));
       [["doc:bold", "Document bold"], ["doc:italic", "Document italic"],
        ["doc:bolditalic", "Document bold italic"], ["doc:regular", "Document regular"]]
         .forEach(([v, label]) => { if (docSiblingFor(b, v.slice(4))) sel.appendChild(new Option(label, v)); });
