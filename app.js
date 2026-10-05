@@ -1827,6 +1827,12 @@
     $("e-prev").disabled = ed.page <= 0;
     $("e-next").disabled = ed.page >= ed.pageCount - 1;
     $("e-label").textContent = "Page " + (ed.page + 1) + " of " + ed.pageCount;
+    $("e-count").textContent = ed.pageCount;
+    { const box = $("e-page");
+      box.max = ed.pageCount;
+      box.style.width = Math.max(3, String(ed.pageCount).length + 1.6) + "ch";
+      if (document.activeElement !== box) box.value = ed.page + 1;      // never overwrite what is being typed
+    }
     editSummary();
     renderProps();
     renderTextPanel();
@@ -3011,6 +3017,7 @@
     // its place in that order and takes its position from the reader, which knows where the
     // text actually landed. Positioned operators re-synchronise the walk if it drifts.
     let cursor = 0;
+    const reach = new Map();                      // operator index -> right edge of the text seen from it so far
     const takeOps = (e, f, size) => {
       // A run that begins with a space is reported from after the space, so the operator
       // sits slightly to the left of where the line is said to start. The baseline must
@@ -3029,7 +3036,22 @@
         // on position anywhere in the stream
         const any = ops.findIndex(o => (o.located &&
           Math.abs(o.matrix[4] - e) < 0.6 && Math.abs(o.matrix[5] - f) < 0.6) || near(o, e, f));
-        if (any < 0) return null;
+        if (any < 0) {
+          // The reader can report one show operator as several pieces (it splits at spaces when
+          // word spacing is set). A piece that starts shortly after the right edge of text
+          // already seen from an operator, on the same baseline, is part of that operator.
+          const sz = size || 10; let share = -1;
+          reach.forEach((right, j) => {
+            const o = ops[j];
+            if (!o.located || Math.abs(o.matrix[5] - f) > 0.6 || e < o.matrix[4] - 0.6) return;
+            const gap = e - right;
+            if (gap > sz * 3 || gap < -1.5 * sz) return;
+            if (share < 0 || o.matrix[4] > ops[share].matrix[4]) share = j;
+          });
+          if (share < 0) return null;
+          const viaShare = [share]; viaShare.shared = true;      // matched as a continuation, not by its own position
+          return viaShare;
+        }
         start = any;
       }
       const out = [start];
@@ -3046,6 +3068,8 @@
       const idxs = takeOps(e, f, Math.hypot(a, b) || Math.hypot(c, d));
       const k = idxs ? idxs[0] : -1;
       const op = k < 0 ? null : ops[k];
+      const viaShare = !!(idxs && idxs.shared);
+      if (op) reach.set(k, Math.max(reach.has(k) ? reach.get(k) : -1e9, e + Math.abs(it.width)));
       const spans = [];
       if (op) {
         idxs.slice(1).forEach(j => { /* continuation pieces are collected below too */ });
@@ -3063,7 +3087,7 @@
             if (!onLine) break;
           }
           spans.push({ opStart: o.start, opEnd: o.end });
-          cursor = j + 1;
+          cursor = Math.max(cursor, j + 1);
         }
       }
       // Size and position come from pdf.js, which has already resolved every layer that
@@ -3081,7 +3105,7 @@
         : (ops.streams && ops.streams.size ? "form" : "unpositioned");
       runs.push({
         str: it.str, x: e, y: f, w: it.width, h: it.height || shown,
-        editable: !!op && trustworthy,
+        editable: !!op && trustworthy, primary: op ? op.start : null, viaShare,
         opStart: op ? op.start : null, opEnd: op ? op.end : null, spans,
         fontRes: op ? op.font : null, reason, stream: op ? op.stream || null : null,
         matrix: op ? op.matrix : null, fill: op ? op.fill : [0, 0, 0],
@@ -3112,15 +3136,19 @@
       const sameInk = !prev || !prev.fill || !r.fill ||
         (Math.abs(prev.fill[0] - r.fill[0]) < 0.02 && Math.abs(prev.fill[1] - r.fill[1]) < 0.02 &&
          Math.abs(prev.fill[2] - r.fill[2]) < 0.02);
+      // Pieces drawn by one operator must stay together whatever the grouping setting: editing
+      // one would delete the operator, and with it the others.
+      const sharesOp = !!prev && prev.editable && r.viaShare && prev.primary != null && prev.primary === r.primary;
       if (prev && prev.editable === r.editable && prev.stream === r.stream && sameInk &&
           Math.abs(prev.size - r.size) < 0.6 &&
           Math.abs(prev.y - r.y) < Math.max(0.5, size * 0.12)) {
         const gap = (r.x - (prev.x + prev.w)) / size;
-        if (gap <= grouping().join && gap > -1.5) {
+        if (sharesOp || (gap <= grouping().join && gap > -1.5)) {
           // a real space between the pieces, or none where the writer split mid-word
           prev.str += (gap >= 0.12 && !/\s$/.test(prev.str) && !/^\s/.test(r.str) ? " " : "") + r.str;
           prev.w = (r.x + r.w) - prev.x;
-          prev.spans = (prev.spans || []).concat(r.spans || []);
+          { const seen = new Set((prev.spans || []).map(s => s.opStart));
+            prev.spans = (prev.spans || []).concat((r.spans || []).filter(s => !seen.has(s.opStart))); }
           prev.h = Math.max(prev.h, r.h);
           if (prev.fontRes !== r.fontRes) prev.mixedFont = true;
           return;
@@ -3648,6 +3676,32 @@
     b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
     b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
   });
+  // ---------- Jump to a page ----------
+  // Type a number and press Enter (or leave the box): out-of-range numbers are brought back into
+  // range, and anything that is not a number puts the current page back.
+  async function goToPage(raw){
+    const n = parseInt(String(raw).replace(/[^\d-]/g, ""), 10);
+    if (!ed.view || !isFinite(n)) { $("e-page").value = ed.page + 1; return; }
+    const target = Math.min(ed.pageCount, Math.max(1, n)) - 1;
+    $("e-page").value = target + 1;
+    if (target === ed.page) return;
+    ed.page = target; ed.sel = null;
+    await editRender();
+  }
+  $("e-page").addEventListener("focus", () => $("e-page").select());
+  $("e-page").addEventListener("keydown", ev => {
+    if (ev.key === "Enter") { ev.preventDefault(); goToPage($("e-page").value); $("e-page").select(); }
+    else if (ev.key === "Escape") { ev.preventDefault(); $("e-page").value = ed.page + 1; $("e-page").blur(); }
+    else if (ev.key === "ArrowUp" || ev.key === "ArrowDown") { ev.preventDefault(); goToPage((parseInt($("e-page").value, 10) || ed.page + 1) + (ev.key === "ArrowUp" ? 1 : -1)); }
+    if (!(ev.ctrlKey || ev.metaKey)) ev.stopPropagation();      // typing here is not a page shortcut, but Ctrl+F, Ctrl+G and Ctrl+S still work
+  });
+  $("e-page").addEventListener("blur", () => { if ($("e-page").value !== String(ed.page + 1)) goToPage($("e-page").value); });
+  document.addEventListener("keydown", ev => {                 // Ctrl/Cmd+G: "Go to page", as in a word processor
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== "g") return;
+    if (!ed.view || $("edit-work").hidden || !$("panel-document").classList.contains("active")) return;
+    ev.preventDefault(); $("e-page").focus();
+  });
+
   // ---------- Find in the document ----------
   // Every page's text is read once (through the same reader that draws the page) and searched
   // as plain strings, so matches can cross the pieces a line is drawn in. Hits are highlighted
@@ -3762,7 +3816,7 @@
   $("find-input").addEventListener("keydown", ev => {
     if (ev.key === "Enter") { ev.preventDefault(); findGo(find.cur + (ev.shiftKey ? -1 : 1)); }
     else if (ev.key === "Escape") { ev.preventDefault(); closeFind(); }
-    ev.stopPropagation();                 // typing here is not a page shortcut
+    if (!(ev.ctrlKey || ev.metaKey)) ev.stopPropagation();     // typing here is not a page shortcut, but Ctrl+G and Ctrl+S still work
   });
   $("find-next").addEventListener("click", () => findGo(find.cur + 1));
   $("find-prev").addEventListener("click", () => findGo(find.cur - 1));

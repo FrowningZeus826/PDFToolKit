@@ -209,3 +209,20 @@ _wr.pages.append(Page(_wr.make_indirect(Dictionary(Type=Name.Page, MediaBox=Arra
     Resources=Dictionary(Font=Dictionary(FA=_wa, FB=_wb)), Contents=_wr.make_stream(b"\n".join(_ops))))))
 _wr.save('fx/word-runs.pdf')
 print('wrote fx/word-runs.pdf')
+
+# Written the way Acrobat Distiller 2.x does: a font of size 1 scaled by the text matrix, with
+# character and word spacing set per line. The reader reports each word of such a line as a
+# piece of its own, but they are all drawn by one show operator and must stay one block. The
+# last line is a row whose cells sit far apart inside one operator: those must NOT be joined.
+_sp = pikepdf.new()
+_f8 = _sp.make_indirect(Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name('/Times-Bold'), Encoding=Name('/MacRomanEncoding')))
+_f9 = _sp.make_indirect(Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name('/Times-Roman'), Encoding=Name('/MacRomanEncoding')))
+_ops = [
+  b"BT /F8 1 Tf 18 0 0 18 152 554 Tm 0.048 Tc 0.476 Tw (An Introduction to Programming) Tj 5.222 -1.111 TD 0.046 Tc 0.464 Tw (with Threads) Tj ET",
+  b"BT /F9 1 Tf 12 0 0 12 144 440 Tm 0.026 Tc 0.259 Tw 14 TL (This is an ordinary paragraph of body text that is) Tj T* (written with word spacing set on every line.) Tj ET",
+  b"BT /F9 10 Tf 1 0 0 1 144 300 Tm [(Left cell) -20000 (Right cell)] TJ ET",
+]
+_sp.pages.append(Page(_sp.make_indirect(Dictionary(Type=Name.Page, MediaBox=Array([0,0,612,792]),
+    Resources=Dictionary(Font=Dictionary(F8=_f8, F9=_f9)), Contents=_sp.make_stream(b"\n".join(_ops))))))
+_sp.save('fx/split-ops.pdf')
+print('wrote fx/split-ops.pdf')

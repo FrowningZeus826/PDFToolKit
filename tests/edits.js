@@ -253,6 +253,33 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      `${before} -> ${after}`); }
  await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000);
 
+ // ---- one operator reported as several pieces (Acrobat Distiller style), and text that stays locked ----
+ await openText('split-ops.pdf');
+ { const info=await p.evaluate(()=>({blocks:document.querySelectorAll('.trun.block').length, locked:document.querySelectorAll('.trun.locked').length}));
+   check('split operators: a line the reader splits into words is editable, not locked', info.blocks>=2 && info.locked===1, JSON.stringify(info));
+   // find the block that holds the title
+   let ti=-1; for (let i=0;i<info.blocks;i++){ await pickBlock(i); const t=await p.$eval('#tx-text',e=>e.value).catch(()=>''); if (t.includes('Introduction to Programming')) { ti=i; break; } }
+   check('split operators: the title is one block with both its lines', ti>=0 && (await p.$eval('#tx-text',e=>e.value))==='An Introduction to Programming\nwith Threads', JSON.stringify(await p.$eval('#tx-text',e=>e.value).catch(()=>'')));
+   await p.$eval('#tx-text',e=>{e.value=e.value.replace('Programming','Concurrency'); e.dispatchEvent(new Event('input'));}); await sleep(600);
+   await H.applyAndDownload(p,'#edit-go'); const dd=await H.takeDownloads(p,1); fs.writeFileSync('split-edited.pdf',dd[0].buf);
+   const tt=execSync('pdftotext split-edited.pdf -').toString().replace(/\s+/g,' ');
+   check('split operators: the edit is saved and the old words are gone', tt.includes('An Introduction to Concurrency') && !tt.includes('Programming'), tt.slice(0,120));
+   check('split operators: nothing else on the page was lost', ['with Threads','ordinary paragraph of body text','written with word spacing','Left cell','Right cell'].every(k=>tt.includes(k)), tt);
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000); }
+ // what has to stay locked is not drawn gray unless "Show all blocks" is on
+ await openText('split-ops.pdf');
+ { const bg=()=>p.evaluate(()=>{const e=document.querySelector('.trun.locked'); const cs=getComputedStyle(e); return {bg:cs.backgroundColor, outline:cs.outlineColor, quiet:e.classList.contains('quiet')};});
+   const setAll=async on=>{ const cur=await p.$eval('#tx-showall',e=>e.getAttribute('aria-pressed')==='true'); if (cur!==on) { await p.evaluate(()=>document.getElementById('tx-showall').click()); await sleep(450); } };
+   await setAll(false);
+   const off=await bg();
+   check('locked text: with Show all off it is not gray (it only shows when pointed at)', off.quiet && off.bg==='rgba(0, 0, 0, 0)', JSON.stringify(off));
+   await setAll(true);
+   const on=await bg();
+   check('locked text: with Show all on it is outlined like the rest', !on.quiet && on.bg!=='rgba(0, 0, 0, 0)', JSON.stringify(on));
+   await setAll(false);
+   await p.evaluate(()=>{const e=document.querySelector('.trun.locked'); e.dispatchEvent(new MouseEvent('click',{bubbles:true}));}); await sleep(500);
+   check('locked text: it can still be selected, and says why it cannot be rewritten', !(await p.$eval('#tx-locked',e=>e.hidden)) && (await txt(p,'#tx-locked-why')).length>20, await txt(p,'#tx-locked-why')); }
+
  // ---- the ribbon: the controls stay above the page instead of in a side panel ----
  await openText('letter.pdf');
  { const ids=await p.evaluate(()=>[...document.querySelectorAll('#tx-ribbon button, #tx-ribbon select, #tx-ribbon input')].map(e=>e.id));
@@ -886,6 +913,33 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      const m=await mp.p.evaluate(()=>({parent:document.getElementById('eprops').parentElement.className, hidden:document.getElementById('eprops').hidden}));
      check('props: on a phone the controls stay in the panel instead of covering the page', m.parent==='ctlcol' && !m.hidden, JSON.stringify(m));
      await mp.p.close(); }
+   // ---- jump to a page by typing its number ----
+   { const lp=H.path.resolve(__dirname,'fx','long.pdf');
+     { const d=await PDFDocument.create(); for (let i=1;i<=40;i++){ const pg=d.addPage([612,792]); pg.drawText('Section '+i+' of the long document',{x:72,y:700,size:20}); } fs.writeFileSync(lp, await d.save()); }
+     const jp=(await H.newPage(b,H.LOCAL,false)).p; await jp.setViewport({width:1280,height:900});
+     await upload(jp,'#edit-input',lp); await jp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+     const where=()=>jp.evaluate(()=>({box:document.getElementById('e-page').value, label:document.getElementById('e-label').textContent, count:document.getElementById('e-count').textContent}));
+     const jump=async v=>{ await jp.click('#e-page',{clickCount:3}); await jp.keyboard.type(String(v)); await jp.keyboard.press('Enter'); await sleep(1200); return where(); };
+     let w=await where();
+     check('page box: shows the current page and the page count', w.box==='1' && w.count==='40' && w.label==='Page 1 of 40', JSON.stringify(w));
+     w=await jump(27); const ink=execSync('echo').toString()&&await jp.evaluate(()=>{const c=document.getElementById('estage-canvas'); return c.width>0;});
+     check('page box: typing a number and pressing Enter jumps there', w.box==='27' && w.label==='Page 27 of 40', JSON.stringify(w));
+     await jp.keyboard.down('Control'); await jp.keyboard.press('f'); await jp.keyboard.up('Control'); await sleep(300);
+     await jp.keyboard.type('Section 27 of'); await sleep(1300);
+     { const fc=await jp.$eval('#find-count',e=>e.textContent), pg=await jp.$eval('#e-label',e=>e.textContent); check('page box: the page it jumped to really is that page (found by search)', fc==='1 of 1' && pg==='Page 27 of 40', fc+' / '+pg); }
+     await jp.keyboard.press('Escape'); await sleep(200);
+     w=await jump(999); check('page box: a number past the end goes to the last page', w.box==='40' && w.label==='Page 40 of 40', JSON.stringify(w));
+     w=await jump(0); check('page box: zero goes to the first page', w.box==='1' && w.label==='Page 1 of 40', JSON.stringify(w));
+     await jump(12); await jp.click('#e-page',{clickCount:3}); await jp.keyboard.type('abc'); await jp.keyboard.press('Enter'); await sleep(600); w=await where();
+     check('page box: text that is not a number puts the current page back', w.box==='12' && w.label==='Page 12 of 40', JSON.stringify(w));
+     await jp.click('#e-page',{clickCount:3}); await jp.keyboard.type('30'); await jp.keyboard.press('Escape'); await sleep(300); w=await where();
+     check('page box: Escape abandons what was typed', w.box==='12' && w.label==='Page 12 of 40', JSON.stringify(w));
+     await jp.evaluate(()=>document.activeElement&&document.activeElement.blur()); await jp.keyboard.down('Control'); await jp.keyboard.press('g'); await jp.keyboard.up('Control'); await sleep(200);
+     check('page box: Ctrl+G puts the cursor in the page box', await jp.evaluate(()=>document.activeElement&&document.activeElement.id==='e-page'));
+     await jp.keyboard.type('5'); await jp.keyboard.press('Enter'); await sleep(900); w=await where();
+     check('page box: Ctrl+G, a number and Enter works from the keyboard alone', w.box==='5' && w.label==='Page 5 of 40', JSON.stringify(w));
+     await jp.click('#e-next'); await sleep(900); w=await where(); check('page box: the arrows still work and update the box', w.box==='6' && w.label==='Page 6 of 40', JSON.stringify(w));
+     await jp.close(); fs.unlinkSync(lp); }
    // ---- find in the document ----
    { const fp=(await H.newPage(b,H.LOCAL,false)).p; await fp.setViewport({width:1280,height:900});
      await upload(fp,'#edit-input',FX('quote.pdf')); await fp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);

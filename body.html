@@ -93,7 +93,8 @@
               <div class="viewer-bar rtools">
               <div class="grp nav">
                 <button class="btn icon" id="e-prev" aria-label="Previous page" title="Previous page">&lsaquo;</button>
-                <span class="pg" id="e-label">Page 1 of 1</span>
+                <label class="pg pagebox" for="e-page">Page <input type="text" id="e-page" inputmode="numeric" pattern="[0-9]*" autocomplete="off" spellcheck="false" aria-label="Page number, press Enter to go to it" title="Type a page number and press Enter (Ctrl+G)" value="1"> of <span id="e-count">1</span></label>
+                <span class="vh" id="e-label" role="status" aria-live="polite">Page 1 of 1</span>
                 <button class="btn icon" id="e-next" aria-label="Next page" title="Next page">&rsaquo;</button>
               </div>
               <div class="grp zoom">
