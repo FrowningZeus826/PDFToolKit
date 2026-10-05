@@ -1997,7 +1997,7 @@
     sel.innerHTML = "";
     const info = block ? docFontFor(block) : null;
     if (info && info.usable) {
-      sel.appendChild(new Option("Match the document", "doc"));
+      sel.appendChild(new Option(dinfo.baseFont ? "Document: " + dinfo.baseFont : "Match the document", "doc"));
       [["bold", "Match the document \u2014 Bold"], ["italic", "Match the document \u2014 Italic"],
        ["bolditalic", "Match the document \u2014 Bold Italic"], ["regular", "Match the document \u2014 Regular"]]
         .forEach(([want, label]) => { if (ed.docSiblings && ed.docSiblings.get(block.fontRes + ":" + want)) sel.appendChild(new Option(label, "doc:" + want)); });
@@ -2212,6 +2212,7 @@
     if (!sel) return;
     const b = ed.tsel !== null && ed.blocks ? ed.blocks[ed.tsel] : null;
     sel.disabled = size.disabled = !b;
+    syncRibbonColors(b, !!b);
     if (!b) {
       document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => { btn.disabled = true; btn.setAttribute("aria-pressed", "false"); btn.classList.remove("armed"); });
       note.textContent = ""; return;          // the status line below the page says how to start; a note here would make the ribbon taller
@@ -2235,6 +2236,7 @@
       btn.disabled = false; btn.setAttribute("aria-pressed", on ? "true" : "false"); btn.classList.toggle("armed", on);
     });
     sel.value = want;
+    sel.title = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : "";
     if (document.activeElement !== size) size.value = String(Math.round((e.size || b.size) * 10) / 10);
     const e2 = ed.textEdits.get(ed.tsel) || {};
     const lines = (e2.text != null ? e2.text : b.text).split("\n").length;
@@ -2260,6 +2262,54 @@
     blockEdit(ed.tsel, { align: btn.dataset.align });
     drawLayer(); editUi();
   }));
+  const blockInk = e => "#" + (e.fill || [0, 0, 0]).map(v => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
+  function ribbonColors(){
+    const host = $("rb-colors"); if (!host || host.dataset.built) return;
+    host.dataset.built = "1";
+    const btn = document.createElement("button");
+    btn.type = "button"; btn.className = "btn icon colorbtn"; btn.id = "rb-colorbtn";
+    btn.title = "Text color"; btn.setAttribute("aria-label", "Text color"); btn.setAttribute("aria-haspopup", "true"); btn.setAttribute("aria-expanded", "false");
+    btn.innerHTML = '<span class="colorA">A</span><span class="colorbar" id="rb-colorbar"></span>';
+    const pop = document.createElement("div");
+    pop.className = "colorpop"; pop.id = "rb-colorpop"; pop.hidden = true;
+    Object.entries(PALETTE).forEach(([hex, name]) => {
+      const bt = document.createElement("button");
+      bt.type = "button"; bt.className = "colorchip"; bt.dataset.hex = hex; bt.style.background = hex;
+      bt.title = name; bt.setAttribute("aria-label", name);
+      bt.addEventListener("click", () => { setBlockInk(hex); closePop(); });
+      pop.appendChild(bt);
+    });
+    const pick = document.createElement("input");
+    pick.type = "color"; pick.className = "colorpick"; pick.id = "rb-color"; pick.title = "More colors\u2026"; pick.setAttribute("aria-label", "Custom text color");
+    pick.addEventListener("input", () => setBlockInk(pick.value));
+    pop.appendChild(pick);
+    const closePop = () => { pop.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+    btn.addEventListener("click", () => {
+      if (!pop.hidden) { closePop(); return; }
+      const r = btn.getBoundingClientRect();
+      pop.hidden = false; pop.style.left = Math.max(8, Math.min(r.left, innerWidth - pop.offsetWidth - 8)) + "px"; pop.style.top = (r.bottom + 4) + "px";
+      btn.setAttribute("aria-expanded", "true");
+    });
+    document.addEventListener("pointerdown", ev => { if (!pop.hidden && !pop.contains(ev.target) && !btn.contains(ev.target)) closePop(); });
+    document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !pop.hidden) { closePop(); btn.focus(); } });
+    host.append(btn, pop);
+  }
+  function setBlockInk(hex){
+    if (ed.tsel === null) return;
+    const c = inkRgb(hex);
+    blockEdit(ed.tsel, { fill: c });
+    drawLayer(); editUi();
+  }
+  function syncRibbonColors(b, on){
+    const host = $("rb-colors"); if (!host) return;
+    ribbonColors();
+    const cur = b ? blockInk(ed.textEdits.get(ed.tsel) || b) : "";
+    host.querySelectorAll(".colorchip").forEach(c => c.classList.toggle("active", on && c.dataset.hex.toLowerCase() === cur.toLowerCase()));
+    $("rb-colorbtn").disabled = !on;
+    $("rb-colorbar").style.background = on ? cur : "transparent";
+    const pick = $("rb-color"); if (pick && on) pick.value = cur.toLowerCase();
+    if (!on) { const pop = $("rb-colorpop"); if (pop) pop.hidden = true; }
+  }
   { const sel = $("rb-font"), size = $("rb-size");
     if (sel) sel.addEventListener("change", () => { if (ed.tsel !== null) { blockEdit(ed.tsel, blockFontFields(ed.blocks[ed.tsel], sel.value)); drawLayer(); editUi(); } });
     if (size) size.addEventListener("input", () => { if (ed.tsel !== null && +size.value > 0) { blockEdit(ed.tsel, { size: +size.value }); drawLayer(); editUi(); } }); }
@@ -3625,8 +3675,12 @@
     const typed = (e.text || "").split("\n");
     const size = e.size || b.size;
     const width = e.width || b.w;
+    // measure with the font the save will use, so the lines break where they will in the file
+    const dInfoM = e.docFontCodes && /^doc/.test(e.fontName || "") && e.docFontCodes.usable && [...(e.text || "").replace(/\n/g, "")].every(ch => ch === " " || e.docFontCodes.toCode.has(ch)) ? e.docFontCodes : null;
+    const stdM = stdFonts[e.fontName] || helv;
+    const meas = dInfoM ? (t, sz) => widthWithDocFont(dInfoM, t, sz) : stdM ? (t, sz) => stdM.widthOfTextAtSize(t, sz) : null;
     const fits = !e.resized && typed.length === b.lineBoxes.length &&
-      (!helv || typed.every((ln, k) => helv.widthOfTextAtSize(ln, size) <= Math.max(b.lineBoxes[k].w, width) * 1.02));
+      (!meas || typed.every((ln, k) => meas(ln, size) <= Math.max(b.lineBoxes[k].w, width) * 1.02));
     const places = [];
     // While someone types on the page, the lines they see are the text; laying them out a
     // second time with different metrics would move words between lines and drop spaces.
@@ -3638,11 +3692,11 @@
     else {
       const lines = [];
       typed.forEach(t => {
-        if (!helv) { lines.push(t); return; }
+        if (!meas) { lines.push(t); return; }
         let line = "";
         for (const word of t.split(/\s+/).filter(Boolean)) {
           const cand = line ? line + " " + word : word;
-          if (helv.widthOfTextAtSize(cand, size) <= Math.max(size, width) || !line) line = cand;
+          if (meas(cand, size) <= Math.max(size, width) || !line) line = cand;
           else { lines.push(line); line = word; }
         }
         lines.push(line);

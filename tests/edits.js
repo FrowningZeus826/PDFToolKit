@@ -327,8 +327,17 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    const pv=await fp.evaluate(()=>({ribbon:document.getElementById('rb-font').value, fam:getComputedStyle(document.querySelector('.tprev')).fontFamily}));
    check('fonts: typing on the page keeps the document font selected in the ribbon', pv.ribbon==='doc', JSON.stringify(pv));
    check('fonts: an edited block is previewed in the font the page is drawn with, not Helvetica', /^"?g_d\d+_f\d+/.test(pv.fam), pv.fam);
+   await fp.click('#rb-colorbtn'); await sleep(200);
+   check('edit colour: the colour button opens the palette', await fp.evaluate(()=>{const p=document.getElementById('rb-colorpop'); const r=p.getBoundingClientRect(); return !p.hidden && r.width>60 && r.top>0 && r.bottom<innerHeight && p.querySelectorAll('.colorchip').length>=6;}));
+   await fp.$eval('#rb-color',e=>{ e.value='#12ab34'; e.dispatchEvent(new Event('input',{bubbles:true})); }); await sleep(400);
+   { const c=await fp.evaluate(()=>[...document.querySelectorAll('.tprev')].map(e=>getComputedStyle(e).color));
+     check('edit colour: the ribbon colour shows on the block as it is typed', c.length>0 && c.every(x=>x==='rgb(18, 171, 52)'), c.join('|')); }
+   { const o=await fp.evaluate(()=>{const s=document.getElementById('rb-font'); return {label:s.selectedOptions[0].textContent, w:Math.round(s.getBoundingClientRect().width), h:Math.round(document.getElementById('docribbon').getBoundingClientRect().height)};});
+     check('edit font: the font box names the document font and is wide enough for it', /^Document: \S+/.test(o.label) && o.w>=170, JSON.stringify(o)); }
    await fp.keyboard.press('Escape'); await sleep(300);
    await H.applyAndDownload(fp,'#edit-go'); const fd=await H.takeDownloads(fp,1); fs.writeFileSync('font-edit.pdf',fd[0].buf);
+   { const img=H.renderPage('font-edit.pdf',1,72); const g=H.inkBox(img,(R,G,B)=>Math.abs(R-18)<50&&Math.abs(G-171)<50&&Math.abs(B-52)<50);
+     check('edit colour: the colour picked is what gets saved', g.n>10, 'green px '+g.n); }
    const before=fontNames(FX('split-ops.pdf')).sort().join(), after=fontNames('font-edit.pdf').sort().join();
    check('fonts: an edit typed on the page is saved in the document\'s font (no font added to the file)', before===after, before+' -> '+after);
    await fp.close(); }
