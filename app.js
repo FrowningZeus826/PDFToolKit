@@ -471,7 +471,8 @@
     const n = work.steps.length;
     $("docbar-steps").textContent = n ? n + " change" + (n > 1 ? "s" : "") + " not saved yet: " + work.steps.join(", ") : "No changes yet";
     $("docbar-steps").classList.toggle("dirty", !!n);
-    $("docbar-undo").hidden = !n;
+    $("docbar-undo").disabled = !n;
+    $("docbar-steps").title = $("docbar-steps").textContent;     // the header may have to cut it short
     $("docbar-dl").disabled = false;           // downloading what's open is always allowed
     $("docbar").dataset.steps = n;             // hook for the test suite
     if (typeof renderFinish === "function") renderFinish();
@@ -557,6 +558,18 @@
       setStatus($("docbar-status"), "success", "Saved " + name + ". The document stays open here if you want to keep working on it.");
     } catch (err) { setStatus($("docbar-status"), "error", err.message); }
   });
+  // Ctrl/Cmd+S downloads what is open, as in a word processor, rather than the browser saving the page
+  document.addEventListener("keydown", ev => {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.key.toLowerCase() !== "s") return;
+    const dl = $("docbar-dl");
+    if (!current || $("docbar").hidden || dl.disabled) return;
+    ev.preventDefault(); dl.click();
+  });
+  // everything that sticks below the header needs to know how tall it is
+  { const hdr = document.querySelector("header.top");
+    const publish = () => document.documentElement.style.setProperty("--hdr", hdr.offsetHeight + "px");
+    publish();
+    if (window.ResizeObserver) new ResizeObserver(publish).observe(hdr); else window.addEventListener("resize", publish); }
   $("docbar-undo").addEventListener("click", async () => {
     const prev = work.undo.pop();
     if (!prev) return;

@@ -37,7 +37,7 @@
   }
   h1, h2 { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; letter-spacing: 0.01em; }
   /* ---------- Header ---------- */
-  header.top { background: var(--black); border-bottom: 3px solid var(--gold); }
+  header.top { background: var(--black); border-bottom: 3px solid var(--gold); position: sticky; top: 0; z-index: 50; }
   .top-inner { display: flex; align-items: center; gap: 12px; padding: 10px 18px; }
   .top-inner img { height: 34px; width: auto; display: block; }
   .top-text h1 { margin: 0; color: #fff; font-weight: 700; font-size: 21px; line-height: 1; }
@@ -52,7 +52,7 @@
     padding: 14px 0;
     display: flex; flex-direction: column;
   }
-  .rail-inner { position: sticky; top: 0; display: flex; flex-direction: column; }
+  .rail-inner { position: sticky; top: var(--hdr, 47px); display: flex; flex-direction: column; }
   .rail-btn {
     display: flex; align-items: center; gap: 12px;
     width: 100%; padding: 12px 18px;
@@ -221,15 +221,23 @@
   html { scroll-padding-top: 96px; }
   .panel-body :is(input, button, select, label, .stage-wrap, .props) { scroll-margin-top: 96px; }
   /* ---------- Working-document bar ---------- */
-  .docbar { position: sticky; top: 0; z-index: 30; background: var(--panel); border-bottom: 1px solid var(--line); padding: 7px 24px; }
-  .docbar-main { display: flex; align-items: center; gap: 16px; max-width: 980px; margin: 0 auto; }
-  .docbar-text { flex: 1; min-width: 0; font-size: 13px; line-height: 1.35; }
-  .docbar-text b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #docbar-steps { color: var(--ink-soft); }
-  #docbar-steps.dirty { color: var(--gold-dim); font-weight: 600; }
-  .docbar-actions { display: flex; gap: 8px; flex: 0 0 auto; }
-  .docbar .status { max-width: 980px; margin: 8px auto 0; }
-  .docbar .status:empty { display: none; }
+  /* Word-style quick access, in the header: save and undo as icons, the file's name and
+     what has changed beside them. No row of its own, so the page gets the height. */
+  .docbar { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; margin-left: 6px; padding-left: 16px; border-left: 1px solid #2A2722; }
+  .qat { display: flex; gap: 2px; flex: 0 0 auto; }
+  .qat-btn { width: 34px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 4px; background: none; color: #E8E3D6; cursor: pointer; }
+  .qat-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .qat-btn:hover:not(:disabled) { background: rgba(255,255,255,.14); }
+  .qat-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .qat-btn:disabled { opacity: .35; cursor: not-allowed; }
+  #docbar-dl:not(:disabled) { color: var(--gold); }
+  .docbar-text { min-width: 0; flex: 1 1 auto; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #A39C8C; }
+  .docbar-text b { display: inline-block; max-width: 45%; vertical-align: bottom; overflow: hidden; text-overflow: ellipsis; color: #fff; font-size: 13px; margin-right: 10px; }
+  #docbar-steps.dirty { color: var(--gold); font-weight: 600; }
+  /* the signed-file warning and save messages: a thin strip only while there is something to say */
+  .docnotices > * { margin: 8px 24px 0; }
+  .docnotices .status:empty { display: none; }
+  .docnotices .rail-signed { font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
   /* ---------- Document workspace: one ribbon above the page ---------- */
   .docribbon { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: 6px 0 10px; }
   .rtabs { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; padding: 0 8px 0 4px; border-bottom: 1px solid var(--line); }
@@ -262,12 +270,12 @@
   /* the page takes the whole width; anything contextual floats over its edge */
   .workarea { display: block; margin-top: 0; }
   .stagecol { min-width: 0; }
-  .stagecol .stage-wrap { max-height: calc(100vh - 215px); }
-  .docribbon.collapsed ~ .workarea .stage-wrap { max-height: calc(100vh - 140px); }
-  .ctlcol { min-width: 0; position: fixed; right: 16px; top: 224px; width: 340px; max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 250px); overflow: auto; z-index: 45; background: var(--panel); border: 1px solid var(--line);
+  .stagecol .stage-wrap { max-height: calc(100vh - var(--hdr, 47px) - 140px); }
+  .docribbon.collapsed ~ .workarea .stage-wrap { max-height: calc(100vh - var(--hdr, 47px) - 70px); }
+  .ctlcol { min-width: 0; position: fixed; right: 16px; top: calc(var(--hdr, 47px) + 134px); width: 340px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - var(--hdr, 47px) - 160px); overflow: auto; z-index: 45; background: var(--panel); border: 1px solid var(--line);
     border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; }
-  .docribbon.collapsed ~ .workarea .ctlcol { top: 150px; }
+  .docribbon.collapsed ~ .workarea .ctlcol { top: calc(var(--hdr, 47px) + 64px); }
   .workarea:not(.has-props) .ctlcol { display: none; }
   .ctlcol .props:first-child { margin-top: 0; }
   /* Word-style tool buttons: icon over a label */
@@ -279,6 +287,7 @@
     padding: 0; box-shadow: none; pointer-events: none; }
   #annot-tools .tool:hover { background: var(--canvas); border-color: var(--line); }
   #annot-tools .tool.active { background: var(--black); color: var(--gold); border-color: var(--black); }
+  @media (max-width: 640px) { .docbar-text { display: none; } .docbar { padding-left: 8px; margin-left: 0; border-left: none; justify-content: flex-start; } }
   @media (max-width: 760px) {
     .ctlcol { position: static; width: auto; max-height: none; box-shadow: none; padding: 0; border: none; background: none; margin-top: 10px; }
     .docribbon.collapsed ~ .workarea .ctlcol { top: auto; }
@@ -386,7 +395,6 @@
   .pagesbar .count { margin-left: auto; color: var(--ink-soft); font-size: 13px; }
   /* ---------- Digital ID / Protect / Optimize ---------- */
   .rail-signed { display: block; margin-top: 6px; color: var(--gold); font-size: 11px; line-height: 1.4; }
-  .docbar .rail-signed { font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-top: 4px; }
   .rail-signed.sig-ok { color: var(--good); background: rgba(47,125,79,0.10); }
   .rail-signed.sig-warn { color: var(--gold-dim); background: rgba(255,182,18,0.12); }
   .rail-signed.sig-bad { color: #fff; background: var(--bad); font-weight: 600; }
@@ -455,7 +463,7 @@
   @media (max-width: 760px) {
     .top-lock span { display: none; }
     .shell { flex-direction: column; min-height: calc(100vh - 57px); }
-    nav.rail { width: 100%; flex: none; padding: 0; position: sticky; top: 0; z-index: 10; }
+    nav.rail { width: 100%; flex: none; padding: 0; position: sticky; top: var(--hdr, 47px); z-index: 40; }
     .rail-inner { position: static; flex-direction: row; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .rail-btn span { white-space: nowrap; }
     .rail-btn { padding: 9px 4px 8px !important; font-size: 11px !important; flex: 0 0 64px !important; }
