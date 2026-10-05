@@ -166,6 +166,14 @@ The tests drive a real headless Chromium and check the output with external tool
 `qpdf`, `pikepdf`, `pyHanko`, `pdftotext` and OpenSSL — rather than trusting the code that
 produced it.
 
+### Continuous integration
+
+`.github/workflows/test.yml` runs on every push to `main` and every pull request: it fetches the
+pinned libraries (SHA-512 verified), builds, checks that the `index.html` and `sw.js` committed for
+GitHub Pages are exactly what that build produces (a stale `sw.js` keeps returning visitors on the
+old page), and runs all five suites in headless Chromium. If that check fails, run `./build.sh`
+and commit the result.
+
 ### Keeping the embedded libraries current
 
 Nothing updates itself at run time; the file you ship is the file that runs. Updating a
