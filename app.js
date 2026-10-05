@@ -1650,11 +1650,18 @@
     const del = document.createElement("button"); del.className = "btn"; del.textContent = "Delete"; del.addEventListener("click", () => deleteObj(o.id));
     head.append(t, del);
     box.appendChild(head);
+    // done with this item: the bar goes away and the item stays on the page
+    const done = document.createElement("button");
+    done.type = "button"; done.className = "propclose"; done.textContent = "\u2715";
+    done.setAttribute("aria-label", "Close these controls"); done.title = "Done (Esc)";
+    done.addEventListener("click", () => { ed.sel = null; drawLayer(); editUi(); });
+    box.appendChild(done);
     if (o.type === "text") {
       const ta = document.createElement("textarea");
       ta.id = "ep-text"; ta.rows = 3; ta.value = o.raw; ta.placeholder = "Type here"; ta.setAttribute("aria-label", "Text");
       const warn = document.createElement("div"); warn.className = "warnline"; warn.hidden = true;
       warn.textContent = "Some characters can't be used in PDF text and were replaced with ?.";
+      ta.addEventListener("keydown", ev => { if (ev.key === "Escape") { ev.preventDefault(); ed.sel = null; drawLayer(); editUi(); } });
       ta.addEventListener("input", () => {
         o.raw = ta.value;
         const c = cleanText(ta.value);
