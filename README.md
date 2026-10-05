@@ -30,11 +30,19 @@ can't be edited safely is marked and says why when you tap it.
 
 Everything on the Document tab lives in a single ribbon, like a word processor's: **Add to page**,
 **Fill form**, **Edit text**, **Redact** and **Whole document** are its tabs, and each tab shows
-only its own controls. Page navigation, zoom and Apply sit beside the tabs. The page takes the
+only its own controls. Page navigation and zoom sit beside the tabs and Apply is at the right end of the ribbon. The page takes the
 full width; anything contextual (the signature builder, a selected object's properties, a form
 field) floats over its edge instead of taking a column. For reading, the arrow at the end of the
 tab row tucks the ribbon away (double-click the open tab does the same); picking a tab brings it
 back. On a phone it starts tucked away so the document comes first.
+
+**Find** (the magnifier beside the zoom controls, or Ctrl/Cmd+F) searches the whole document:
+matches are highlighted on the page, Enter and Shift+Enter step through them across pages, and
+the count says where you are. It reads the same text layer the page is drawn from, so a scan has
+nothing to search until OCR has run.
+
+Save and Undo are icons in the header, next to the file's name and what has changed (Ctrl+S
+downloads what is open), so no row of the page is spent on them.
 
 ### Finding your way around
 
@@ -157,6 +165,14 @@ only want the site.
 The tests drive a real headless Chromium and check the output with external tools —
 `qpdf`, `pikepdf`, `pyHanko`, `pdftotext` and OpenSSL — rather than trusting the code that
 produced it.
+
+### Continuous integration
+
+`.github/workflows/test.yml` runs on every push to `main` and every pull request: it fetches the
+pinned libraries (SHA-512 verified), builds, checks that the `index.html` and `sw.js` committed for
+GitHub Pages are exactly what that build produces (a stale `sw.js` keeps returning visitors on the
+old page), and runs all five suites in headless Chromium. If that check fails, run `./build.sh`
+and commit the result.
 
 ### Keeping the embedded libraries current
 

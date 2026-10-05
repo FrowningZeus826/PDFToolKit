@@ -1,0 +1,80 @@
+name: tests
+
+# Builds the site from the pinned, hash-verified dependencies, checks that the files committed
+# for GitHub Pages are what that build produces, then runs every suite in headless Chromium
+# against external validators (qpdf, pikepdf, pyHanko, poppler, OpenSSL).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CHROMIUM_PATH: /usr/bin/google-chrome
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install the validators the suites check output with
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qpdf poppler-utils fonts-liberation openssl
+          python -m pip install --upgrade pip
+          python -m pip install pikepdf pyhanko pillow reportlab
+
+      - name: Fetch the pinned libraries (SHA-512 verified against the registry)
+        run: bash fetch-deps.sh
+
+      - name: Build
+        run: bash build.sh --no-test
+
+      - name: The files committed for GitHub Pages must match a fresh build
+        run: |
+          if ! git diff --exit-code --stat -- index.html sw.js manifest.webmanifest icon.svg icon-maskable.svg; then
+            echo "::error::The published files are stale. Run ./build.sh and commit index.html and sw.js (a stale sw.js keeps returning visitors on the old page)."
+            exit 1
+          fi
+
+      - name: Install the test dependencies and build the fixtures
+        working-directory: tests
+        run: |
+          npm ci
+          bash fixtures/make-fixtures.sh
+
+      - name: Main suite
+        working-directory: tests
+        run: node suite.js
+
+      - name: Editing, redaction and find suite
+        working-directory: tests
+        run: node edits.js
+
+      - name: Privacy, signing, encryption, OCR and compression suite
+        working-directory: tests
+        run: node adv.js
+
+      - name: Works with the network blocked
+        working-directory: tests
+        run: node offline.js
+
+      - name: Installable app and service worker
+        working-directory: tests
+        run: node pwa.js

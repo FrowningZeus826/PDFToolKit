@@ -852,6 +852,76 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    const g2=await p.evaluate(()=>{const st=document.querySelector('.stagecol').getBoundingClientRect(), c=document.querySelector('.ctlcol').getBoundingClientRect(), mid=document.elementFromPoint(c.left+c.width/2,c.top+30); return {page:Math.round(st.width), floats:getComputedStyle(document.querySelector('.ctlcol')).position==='fixed', on_top:!!(mid&&mid.closest('.ctlcol'))};});
    check('ribbon: the signature panel floats over the page instead of narrowing it', g2.floats && g2.on_top && g2.page===g.page, JSON.stringify(g2));
    await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await sleep(300);
+   // the quick-access bar: save and undo as icons in the header, no banner row of its own
+   await p.evaluate(()=>window.scrollTo(0,0)); await sleep(200);
+   { const q=await p.evaluate(()=>{const h=document.querySelector('header.top').getBoundingClientRect(), r=document.getElementById('docribbon').getBoundingClientRect();
+       const dl=document.getElementById('docbar-dl'), un=document.getElementById('docbar-undo'), steps=+document.getElementById('docbar').dataset.steps;
+       return {inHeader:!!document.querySelector('header.top #docbar'), icons:!!dl.querySelector('svg')&&!!un.querySelector('svg')&&dl.textContent.trim()===''&&un.textContent.trim()==='',
+         labelled:!!dl.getAttribute('aria-label')&&!!un.getAttribute('aria-label'), gap:Math.round(r.top-h.bottom), undoOk:un.disabled===(steps===0), steps, sticky:getComputedStyle(document.querySelector('header.top')).position};});
+     check('header: save and undo are icon buttons in the header', q.inHeader && q.icons && q.labelled, JSON.stringify(q));
+     check('header: no banner row, so the ribbon sits right under the header', q.gap>=0 && q.gap<=24 && q.sticky==='sticky', JSON.stringify(q));
+     check('header: undo is only enabled when there is something to undo', q.undoOk, JSON.stringify(q));
+     await p.keyboard.down('Control'); await p.keyboard.press('s'); await p.keyboard.up('Control');
+     const dls=await H.takeDownloads(p,1).catch(()=>[]);
+     check('header: Ctrl+S downloads the document', dls.length===1 && dls[0].buf.slice(0,5).toString()==='%PDF-', dls.length+' download(s)'); }
+   // the selected object's controls ride next to the object, not in the ribbon or a side column
+   { await p.evaluate(()=>window.scrollTo(0,0)); await sleep(150);
+     const rb0=await p.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height)), pg0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().top));
+     await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=box]').click());
+     const sb=await (await p.$('#estage')).boundingBox(); await p.mouse.click(sb.x+sb.width*0.5, sb.y+sb.height*0.6); await sleep(600);
+     const g=await p.evaluate(()=>{const bar=document.getElementById('eprops'), o=document.querySelector('.eobj.sel'), br=bar.getBoundingClientRect(), or=o.getBoundingClientRect();
+       return {parent:bar.parentElement.id, hidden:bar.hidden, near:Math.min(Math.abs(br.bottom-or.top), Math.abs(br.top-or.bottom))<=24, overlapsObj:!(br.bottom<=or.top||br.top>=or.bottom||br.right<=or.left||br.left>=or.right),
+         sidePanel:document.getElementById('workarea').classList.contains('has-props'), ribbon:Math.round(document.getElementById('docribbon').getBoundingClientRect().height), pageTop:Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().top), n:document.querySelectorAll('.eobj').length};});
+     check('props: the controls sit next to the selected object, not over it', g.parent==='estage' && !g.hidden && g.near && !g.overlapsObj, JSON.stringify(g));
+     check('props: selecting an object adds nothing to the ribbon and moves nothing', !g.sidePanel && g.ribbon===rb0 && g.pageTop===pg0, JSON.stringify({rb0,pg0,...g}));
+     // pressing inside the bar must not fall through to the page and deselect the object
+     const cr=await (await p.$('#eprops .colorchip[title=Red]')).boundingBox(); await p.mouse.click(cr.x+cr.width/2, cr.y+cr.height/2); await sleep(400);
+     const after=await p.evaluate(()=>({n:document.querySelectorAll('.eobj').length, sel:!!document.querySelector('.eobj.sel'), hidden:document.getElementById('eprops').hidden}));
+     check('props: clicking inside the bar keeps the selection', after.n===g.n && after.sel && !after.hidden, JSON.stringify(after));
+     await p.evaluate(()=>document.querySelector('#eprops .prophead .btn').click()); await sleep(300);
+     check('props: Delete in the bar removes the object and the bar goes away', (await p.$$('.eobj')).length===g.n-1 && await p.$eval('#eprops',e=>e.hidden)); }
+   { const mp=(await H.newPage(b,H.LOCAL,true)); await upload(mp.p,'#edit-input',FX('a.pdf')); await mp.p.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
+     await mp.p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=box]').click());
+     const mb=await (await mp.p.$('#estage')).boundingBox(); await mp.p.mouse.click(mb.x+mb.width*0.5, mb.y+mb.height*0.4); await sleep(600);
+     const m=await mp.p.evaluate(()=>({parent:document.getElementById('eprops').parentElement.className, hidden:document.getElementById('eprops').hidden}));
+     check('props: on a phone the controls stay in the panel instead of covering the page', m.parent==='ctlcol' && !m.hidden, JSON.stringify(m));
+     await mp.p.close(); }
+   // ---- find in the document ----
+   { const fp=(await H.newPage(b,H.LOCAL,false)).p; await fp.setViewport({width:1280,height:900});
+     await upload(fp,'#edit-input',FX('quote.pdf')); await fp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+     const count=()=>fp.$eval('#find-count',e=>e.textContent);
+     const typeQ=async q=>{ await fp.$eval('#find-input',e=>{e.value='';}); await fp.focus('#find-input'); await fp.keyboard.type(q); await sleep(1100); };
+     await fp.keyboard.down('Control'); await fp.keyboard.press('f'); await fp.keyboard.up('Control'); await sleep(300);
+     check('find: Ctrl+F opens the find bar with the box focused', !(await fp.$eval('#findbar',e=>e.hidden)) && await fp.evaluate(()=>document.activeElement&&document.activeElement.id==='find-input'));
+     await typeQ('flag');
+     const truth=execSync('pdftotext fx/quote.pdf -').toString().toLowerCase().split('flag').length-1;
+     check('find: the match count agrees with pdftotext', (await count())==='1 of '+truth && truth===3, (await count())+' vs '+truth);
+     check('find: every match on the page is highlighted, one of them as current', (await fp.$$('.fhit')).length===truth && (await fp.$$('.fhit.cur')).length===1);
+     // positions against pdftotext's own word boxes
+     const boxes=[...execSync('pdftotext -bbox fx/quote.pdf -').toString().matchAll(/xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">FLAG</g)].map(m=>m.slice(1,5).map(Number));
+     const hits=await fp.evaluate(()=>{const st=document.getElementById('estage').getBoundingClientRect(), k=612/st.width; return [...document.querySelectorAll('.fhit')].map(h=>{const r=h.getBoundingClientRect(); return [(r.left-st.left)*k,(r.top-st.top)*k,(r.right-st.left)*k,(r.bottom-st.top)*k];});});
+     const near=(h,w)=>Math.abs(h[0]-w[0])<3 && Math.abs(h[2]-w[2])<3 && h[1]<=w[3] && h[3]>=w[1] && Math.abs((h[1]+h[3])/2-(w[1]+w[3])/2)<4;
+     check('find: highlights sit on the words (checked against pdftotext boxes)', boxes.length===truth && boxes.every(w=>hits.some(h=>near(h,w))), JSON.stringify({hits:hits.map(h=>h.map(Math.round)),boxes:boxes.map(h=>h.map(Math.round))}));
+     await fp.keyboard.press('Enter'); await sleep(400); const second=await count();
+     await fp.keyboard.down('Shift'); await fp.keyboard.press('Enter'); await fp.keyboard.up('Shift'); await sleep(300); const back=await count();
+     await fp.keyboard.down('Shift'); await fp.keyboard.press('Enter'); await fp.keyboard.up('Shift'); await sleep(300); const wrap=await count();
+     check('find: Enter goes forward, Shift+Enter back, and it wraps around', second==='2 of 3' && back==='1 of 3' && wrap==='3 of 3', [second,back,wrap].join(' / '));
+     await typeQ('FLAG'); check('find: it ignores case', (await count())==='1 of 3', await count());
+     await typeQ('zzzqq'); check('find: no match says so and highlights nothing', (await count())==='No matches' && (await fp.$$('.fhit')).length===0, await count());
+     await fp.keyboard.press('Escape'); await sleep(300);
+     check('find: Escape closes the bar and clears the highlights', await fp.$eval('#findbar',e=>e.hidden) && (await fp.$$('.fhit')).length===0);
+     await fp.close(); }
+   { const fp=(await H.newPage(b,H.LOCAL,false)).p; await fp.setViewport({width:1280,height:900});
+     await upload(fp,'#edit-input',FX('a.pdf')); await fp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+     await fp.click('#e-find'); await sleep(200); await fp.keyboard.type('page'); await sleep(1300);
+     const seq=[]; for (let i=0;i<3;i++){ seq.push((await fp.$eval('#find-count',e=>e.textContent))+' p'+(await fp.$eval('#e-label',e=>e.textContent.match(/Page (\d+)/)[1]))+' hits'+(await fp.$$('.fhit')).length); await fp.keyboard.press('Enter'); await sleep(900); }
+     check('find: stepping carries the view to the page each match is on (including a rotated page)', seq.join(' | ')==='1 of 3 p1 hits1 | 2 of 3 p2 hits1 | 3 of 3 p3 hits1', seq.join(' | '));
+     await fp.close(); }
+   { const mp=(await H.newPage(b,H.LOCAL,true)).p; await upload(mp,'#edit-input',FX('quote.pdf')); await mp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
+     await mp.evaluate(()=>document.getElementById('e-find').click()); await sleep(300); await mp.keyboard.type('flag'); await sleep(1200);
+     const m=await mp.evaluate(()=>{const r=document.getElementById('findbar').getBoundingClientRect(); return {l:Math.round(r.left), r:Math.round(r.right), vw:innerWidth, count:document.getElementById('find-count').textContent, hits:document.querySelectorAll('.fhit').length};});
+     check('find: on a phone the bar fits the screen and still finds', m.l>=0 && m.r<=m.vw && m.count==='1 of 3' && m.hits===3, JSON.stringify(m));
+     await mp.close(); }
    // collapsing for reading
    const h0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().height));
    await p.evaluate(()=>document.getElementById('rb-collapse').click()); await sleep(900);

@@ -5,6 +5,17 @@
       <h1>__TITLE__</h1>
       <p>__ORG__</p>
     </div>
+    <div class="docbar" id="docbar" hidden>
+      <div class="qat" role="toolbar" aria-label="Document">
+        <button class="qat-btn" id="docbar-dl" disabled title="Download a copy (Ctrl+S)" aria-label="Download a copy of the document">
+          <svg viewBox="0 0 24 24"><path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg>
+        </button>
+        <button class="qat-btn" id="docbar-undo" disabled title="Undo the last change" aria-label="Undo the last change">
+          <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+        </button>
+      </div>
+      <div class="docbar-text"><b id="docbar-name"></b><span id="docbar-steps"></span></div>
+    </div>
     <div class="top-lock" title="Files are processed on this device and never uploaded">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
       <span>__BADGE__</span>
@@ -42,18 +53,8 @@
   </nav>
 
   <main class="work">
-    <div class="docbar" id="docbar" hidden>
-      <div class="docbar-main">
-        <div class="docbar-text">
-          <b id="docbar-name"></b>
-          <span id="docbar-steps"></span>
-          <span class="rail-signed" id="docbar-sig" hidden>Digitally signed &mdash; any change here produces a copy without a valid signature.</span>
-        </div>
-        <div class="docbar-actions">
-          <button class="btn" id="docbar-undo" hidden>Undo</button>
-          <button class="btn strong" id="docbar-dl" disabled>Download</button>
-        </div>
-      </div>
+    <div class="docnotices" id="docnotices">
+      <span class="rail-signed" id="docbar-sig" hidden>Digitally signed &mdash; any change here produces a copy without a valid signature.</span>
       <div class="status" id="docbar-status" role="status"></div>
     </div>
 
@@ -104,6 +105,7 @@
               <div class="grp file">
                 <span class="dfname" id="edit-name"></span>
                 <label class="btn" id="edit-open" tabindex="0" role="button" title="Open another PDF">Open<input type="file" id="edit-input2" class="vh" accept="application/pdf,.pdf"></label>
+                <button class="btn icon" id="e-find" aria-label="Find in document" title="Find in document (Ctrl+F)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg></button>
                 <button class="btn icon" id="rb-collapse" aria-expanded="true" aria-controls="rbody" title="Hide the ribbon to read" aria-label="Hide the ribbon">&#8963;</button>
               </div>
             </div>
@@ -196,8 +198,15 @@
           </div>
           <div class="workarea" id="workarea">
             <div class="stagecol">
+              <div class="findbar" id="findbar" role="search" hidden>
+                <input type="search" id="find-input" placeholder="Find in document" aria-label="Find in document" autocomplete="off" spellcheck="false">
+                <span class="muted" id="find-count" role="status" aria-live="polite"></span>
+                <button class="btn icon" id="find-prev" aria-label="Previous match" title="Previous (Shift+Enter)">&#9650;</button>
+                <button class="btn icon" id="find-next" aria-label="Next match" title="Next (Enter)">&#9660;</button>
+                <button class="btn icon" id="find-close" aria-label="Close find" title="Close (Esc)">&#10005;</button>
+              </div>
               <div class="stage-wrap">
-              <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div></div>
+              <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div><div class="props" id="eprops" hidden></div></div>
             </div>
             </div>
             <div class="ctlcol">
@@ -266,7 +275,6 @@
           </div>
         </div>
           </div>
-<div class="props" id="eprops" hidden></div>
 <div class="props" id="fpanel" hidden>
             <div class="prophead"><b id="f-label"></b><span class="muted" id="f-pos"></span></div>
             <div id="f-input"></div>

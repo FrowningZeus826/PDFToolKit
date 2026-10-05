@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-uCBwbpsOIKtzrSlnfK2KCXkghKoTh3a3Ax1jMEPvwJE=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-/BVCBa/6AdoHPxYak2+nfF0Q9x++CPD/srjy8054Mjk=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -47,7 +47,7 @@
   }
   h1, h2 { font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif; letter-spacing: 0.01em; }
   /* ---------- Header ---------- */
-  header.top { background: var(--black); border-bottom: 3px solid var(--gold); }
+  header.top { background: var(--black); border-bottom: 3px solid var(--gold); position: sticky; top: 0; z-index: 50; }
   .top-inner { display: flex; align-items: center; gap: 12px; padding: 10px 18px; }
   .top-inner img { height: 34px; width: auto; display: block; }
   .top-text h1 { margin: 0; color: #fff; font-weight: 700; font-size: 21px; line-height: 1; }
@@ -62,7 +62,7 @@
     padding: 14px 0;
     display: flex; flex-direction: column;
   }
-  .rail-inner { position: sticky; top: 0; display: flex; flex-direction: column; }
+  .rail-inner { position: sticky; top: var(--hdr, 47px); display: flex; flex-direction: column; }
   .rail-btn {
     display: flex; align-items: center; gap: 12px;
     width: 100%; padding: 12px 18px;
@@ -231,15 +231,23 @@
   html { scroll-padding-top: 96px; }
   .panel-body :is(input, button, select, label, .stage-wrap, .props) { scroll-margin-top: 96px; }
   /* ---------- Working-document bar ---------- */
-  .docbar { position: sticky; top: 0; z-index: 30; background: var(--panel); border-bottom: 1px solid var(--line); padding: 7px 24px; }
-  .docbar-main { display: flex; align-items: center; gap: 16px; max-width: 980px; margin: 0 auto; }
-  .docbar-text { flex: 1; min-width: 0; font-size: 13px; line-height: 1.35; }
-  .docbar-text b { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #docbar-steps { color: var(--ink-soft); }
-  #docbar-steps.dirty { color: var(--gold-dim); font-weight: 600; }
-  .docbar-actions { display: flex; gap: 8px; flex: 0 0 auto; }
-  .docbar .status { max-width: 980px; margin: 8px auto 0; }
-  .docbar .status:empty { display: none; }
+  /* Word-style quick access, in the header: save and undo as icons, the file's name and
+     what has changed beside them. No row of its own, so the page gets the height. */
+  .docbar { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1 1 auto; margin-left: 6px; padding-left: 16px; border-left: 1px solid #2A2722; }
+  .qat { display: flex; gap: 2px; flex: 0 0 auto; }
+  .qat-btn { width: 34px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border: none; border-radius: 4px; background: none; color: #E8E3D6; cursor: pointer; }
+  .qat-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .qat-btn:hover:not(:disabled) { background: rgba(255,255,255,.14); }
+  .qat-btn:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .qat-btn:disabled { opacity: .35; cursor: not-allowed; }
+  #docbar-dl:not(:disabled) { color: var(--gold); }
+  .docbar-text { min-width: 0; flex: 1 1 auto; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #A39C8C; }
+  .docbar-text b { display: inline-block; max-width: 45%; vertical-align: bottom; overflow: hidden; text-overflow: ellipsis; color: #fff; font-size: 13px; margin-right: 10px; }
+  #docbar-steps.dirty { color: var(--gold); font-weight: 600; }
+  /* the signed-file warning and save messages: a thin strip only while there is something to say */
+  .docnotices > * { margin: 8px 24px 0; }
+  .docnotices .status:empty { display: none; }
+  .docnotices .rail-signed { font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; }
   /* ---------- Document workspace: one ribbon above the page ---------- */
   .docribbon { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: 6px 0 10px; }
   .rtabs { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; padding: 0 8px 0 4px; border-bottom: 1px solid var(--line); }
@@ -272,14 +280,36 @@
   /* the page takes the whole width; anything contextual floats over its edge */
   .workarea { display: block; margin-top: 0; }
   .stagecol { min-width: 0; }
-  .stagecol .stage-wrap { max-height: calc(100vh - 215px); }
-  .docribbon.collapsed ~ .workarea .stage-wrap { max-height: calc(100vh - 140px); }
-  .ctlcol { min-width: 0; position: fixed; right: 16px; top: 224px; width: 340px; max-width: calc(100vw - 32px);
-    max-height: calc(100vh - 250px); overflow: auto; z-index: 45; background: var(--panel); border: 1px solid var(--line);
+  .stagecol .stage-wrap { max-height: calc(100vh - var(--hdr, 47px) - 140px); }
+  .docribbon.collapsed ~ .workarea .stage-wrap { max-height: calc(100vh - var(--hdr, 47px) - 70px); }
+  .ctlcol { min-width: 0; position: fixed; right: 16px; top: calc(var(--hdr, 47px) + 134px); width: 340px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - var(--hdr, 47px) - 160px); overflow: auto; z-index: 45; background: var(--panel); border: 1px solid var(--line);
     border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; }
-  .docribbon.collapsed ~ .workarea .ctlcol { top: 150px; }
+  .docribbon.collapsed ~ .workarea .ctlcol { top: calc(var(--hdr, 47px) + 64px); }
   .workarea:not(.has-props) .ctlcol { display: none; }
   .ctlcol .props:first-child { margin-top: 0; }
+  /* find in the document: a small bar over the corner of the page area, so it adds no height */
+  .stagecol { position: relative; }
+  .findbar { position: absolute; top: 10px; right: 24px; z-index: 55; display: flex; align-items: center; gap: 6px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 5px 6px 5px 8px; box-shadow: 0 6px 22px rgba(0,0,0,.22); }
+  .findbar[hidden] { display: none; }
+  .findbar input[type=search] { width: 190px; padding: 5px 8px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .findbar #find-count { min-width: 64px; font-size: 12.5px; text-align: center; white-space: nowrap; }
+  .findbar .btn.icon { padding: 4px 8px; min-width: 28px; font-size: 12px; line-height: 1; }
+  .fhit { position: absolute; background: rgba(255, 213, 0, .45); mix-blend-mode: multiply; border-radius: 2px; pointer-events: none; }
+  .fhit.cur { background: rgba(255, 140, 0, .6); outline: 2px solid #E07B00; }
+  @media (max-width: 760px) { .findbar { left: 8px; right: 8px; top: 6px; } .findbar input[type=search] { flex: 1; width: auto; min-width: 0; } }
+  /* the selected object's controls: a small bar attached to the object, over the page */
+  #estage > #eprops { position: absolute; z-index: 60; margin: 0; padding: 6px 10px; line-height: normal; width: max-content;
+    max-width: min(640px, calc(100% - 8px)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+    box-shadow: 0 6px 22px rgba(0,0,0,.24); border-radius: 8px; cursor: default; }
+  #estage > #eprops[hidden] { display: none; }
+  #estage > #eprops .prophead { margin: 0; gap: 10px; }
+  #estage > #eprops .proprow { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+  #estage > #eprops textarea { width: 230px; height: 56px; min-height: 0; padding: 5px 7px; font-size: 13px; }
+  #estage > #eprops select { width: auto; max-width: 180px; padding: 4px 6px; font-size: 13px; }
+  #estage > #eprops input[type=range] { width: 90px; }
+  #estage > #eprops .warnline { flex: 1 1 100%; margin: 0; }
   /* Word-style tool buttons: icon over a label */
   #annot-tools { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; }
   #annot-tools .tool { flex-direction: column; justify-content: center; gap: 3px; width: 56px; height: 50px; padding: 4px 2px 3px;
@@ -289,6 +319,7 @@
     padding: 0; box-shadow: none; pointer-events: none; }
   #annot-tools .tool:hover { background: var(--canvas); border-color: var(--line); }
   #annot-tools .tool.active { background: var(--black); color: var(--gold); border-color: var(--black); }
+  @media (max-width: 640px) { .docbar-text { display: none; } .docbar { padding-left: 8px; margin-left: 0; border-left: none; justify-content: flex-start; } }
   @media (max-width: 760px) {
     .ctlcol { position: static; width: auto; max-height: none; box-shadow: none; padding: 0; border: none; background: none; margin-top: 10px; }
     .docribbon.collapsed ~ .workarea .ctlcol { top: auto; }
@@ -396,7 +427,6 @@
   .pagesbar .count { margin-left: auto; color: var(--ink-soft); font-size: 13px; }
   /* ---------- Digital ID / Protect / Optimize ---------- */
   .rail-signed { display: block; margin-top: 6px; color: var(--gold); font-size: 11px; line-height: 1.4; }
-  .docbar .rail-signed { font-size: 12px; padding: 3px 8px; border-radius: 4px; display: inline-block; margin-top: 4px; }
   .rail-signed.sig-ok { color: var(--good); background: rgba(47,125,79,0.10); }
   .rail-signed.sig-warn { color: var(--gold-dim); background: rgba(255,182,18,0.12); }
   .rail-signed.sig-bad { color: #fff; background: var(--bad); font-weight: 600; }
@@ -465,7 +495,7 @@
   @media (max-width: 760px) {
     .top-lock span { display: none; }
     .shell { flex-direction: column; min-height: calc(100vh - 57px); }
-    nav.rail { width: 100%; flex: none; padding: 0; position: sticky; top: 0; z-index: 10; }
+    nav.rail { width: 100%; flex: none; padding: 0; position: sticky; top: var(--hdr, 47px); z-index: 40; }
     .rail-inner { position: static; flex-direction: row; overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .rail-btn span { white-space: nowrap; }
     .rail-btn { padding: 9px 4px 8px !important; font-size: 11px !important; flex: 0 0 64px !important; }
@@ -523,6 +553,17 @@
     <div class="top-text">
       <h1>PDF Tool Kit</h1>
     </div>
+    <div class="docbar" id="docbar" hidden>
+      <div class="qat" role="toolbar" aria-label="Document">
+        <button class="qat-btn" id="docbar-dl" disabled title="Download a copy (Ctrl+S)" aria-label="Download a copy of the document">
+          <svg viewBox="0 0 24 24"><path d="M5 3h11l4 4v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M8 3v5h7V3"/><rect x="7" y="13" width="10" height="8" rx="1"/></svg>
+        </button>
+        <button class="qat-btn" id="docbar-undo" disabled title="Undo the last change" aria-label="Undo the last change">
+          <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+        </button>
+      </div>
+      <div class="docbar-text"><b id="docbar-name"></b><span id="docbar-steps"></span></div>
+    </div>
     <div class="top-lock" title="Files are processed on this device and never uploaded">
       <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
       <span>Everything runs in your browser</span>
@@ -560,18 +601,8 @@
   </nav>
 
   <main class="work">
-    <div class="docbar" id="docbar" hidden>
-      <div class="docbar-main">
-        <div class="docbar-text">
-          <b id="docbar-name"></b>
-          <span id="docbar-steps"></span>
-          <span class="rail-signed" id="docbar-sig" hidden>Digitally signed &mdash; any change here produces a copy without a valid signature.</span>
-        </div>
-        <div class="docbar-actions">
-          <button class="btn" id="docbar-undo" hidden>Undo</button>
-          <button class="btn strong" id="docbar-dl" disabled>Download</button>
-        </div>
-      </div>
+    <div class="docnotices" id="docnotices">
+      <span class="rail-signed" id="docbar-sig" hidden>Digitally signed &mdash; any change here produces a copy without a valid signature.</span>
       <div class="status" id="docbar-status" role="status"></div>
     </div>
 
@@ -622,6 +653,7 @@
               <div class="grp file">
                 <span class="dfname" id="edit-name"></span>
                 <label class="btn" id="edit-open" tabindex="0" role="button" title="Open another PDF">Open<input type="file" id="edit-input2" class="vh" accept="application/pdf,.pdf"></label>
+                <button class="btn icon" id="e-find" aria-label="Find in document" title="Find in document (Ctrl+F)"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="10.5" cy="10.5" r="6"/><path d="M15 15l5.5 5.5"/></svg></button>
                 <button class="btn icon" id="rb-collapse" aria-expanded="true" aria-controls="rbody" title="Hide the ribbon to read" aria-label="Hide the ribbon">&#8963;</button>
               </div>
             </div>
@@ -714,8 +746,15 @@
           </div>
           <div class="workarea" id="workarea">
             <div class="stagecol">
+              <div class="findbar" id="findbar" role="search" hidden>
+                <input type="search" id="find-input" placeholder="Find in document" aria-label="Find in document" autocomplete="off" spellcheck="false">
+                <span class="muted" id="find-count" role="status" aria-live="polite"></span>
+                <button class="btn icon" id="find-prev" aria-label="Previous match" title="Previous (Shift+Enter)">&#9650;</button>
+                <button class="btn icon" id="find-next" aria-label="Next match" title="Next (Enter)">&#9660;</button>
+                <button class="btn icon" id="find-close" aria-label="Close find" title="Close (Esc)">&#10005;</button>
+              </div>
               <div class="stage-wrap">
-              <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div></div>
+              <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div><div class="props" id="eprops" hidden></div></div>
             </div>
             </div>
             <div class="ctlcol">
@@ -784,7 +823,6 @@
           </div>
         </div>
           </div>
-<div class="props" id="eprops" hidden></div>
 <div class="props" id="fpanel" hidden>
             <div class="prophead"><b id="f-label"></b><span class="muted" id="f-pos"></span></div>
             <div id="f-input"></div>
@@ -1834,7 +1872,8 @@ else if (typeof exports === 'object')
     const n = work.steps.length;
     $("docbar-steps").textContent = n ? n + " change" + (n > 1 ? "s" : "") + " not saved yet: " + work.steps.join(", ") : "No changes yet";
     $("docbar-steps").classList.toggle("dirty", !!n);
-    $("docbar-undo").hidden = !n;
+    $("docbar-undo").disabled = !n;
+    $("docbar-steps").title = $("docbar-steps").textContent;     // the header may have to cut it short
     $("docbar-dl").disabled = false;           // downloading what's open is always allowed
     $("docbar").dataset.steps = n;             // hook for the test suite
     if (typeof renderFinish === "function") renderFinish();
@@ -1920,6 +1959,18 @@ else if (typeof exports === 'object')
       setStatus($("docbar-status"), "success", "Saved " + name + ". The document stays open here if you want to keep working on it.");
     } catch (err) { setStatus($("docbar-status"), "error", err.message); }
   });
+  // Ctrl/Cmd+S downloads what is open, as in a word processor, rather than the browser saving the page
+  document.addEventListener("keydown", ev => {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.key.toLowerCase() !== "s") return;
+    const dl = $("docbar-dl");
+    if (!current || $("docbar").hidden || dl.disabled) return;
+    ev.preventDefault(); dl.click();
+  });
+  // everything that sticks below the header needs to know how tall it is
+  { const hdr = document.querySelector("header.top");
+    const publish = () => document.documentElement.style.setProperty("--hdr", hdr.offsetHeight + "px");
+    publish();
+    if (window.ResizeObserver) new ResizeObserver(publish).observe(hdr); else window.addEventListener("resize", publish); }
   $("docbar-undo").addEventListener("click", async () => {
     const prev = work.undo.pop();
     if (!prev) return;
@@ -2685,6 +2736,7 @@ else if (typeof exports === 'object')
 
   function drawLayer(){
     eLayer.innerHTML = "";
+    drawFindMarks();
     if (ed.mode === "doc") { drawDocMarksPreview(); return; }
     if (ed.mode === "text") { drawTextOverlays(); return; }
     if (ed.mode === "redact") { drawRedactions(); return; }
@@ -2778,6 +2830,7 @@ else if (typeof exports === 'object')
         clampObj(o);
         if (resizing && o.type === "text") { drawLayer(); return; }
         Object.assign(target.style, { left: o.x * s + "px", top: o.y * s + "px", width: o.w * s + "px", height: o.h * s + "px" });
+        positionProps();
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
@@ -2946,7 +2999,32 @@ else if (typeof exports === 'object')
     return row;
   }
 
-  function renderProps(){
+  // The selected object's controls ride next to the object, above it or below it when there is
+  // no room, so nothing is added to the ribbon and the page does not move when you select
+  // something. On a phone, where a bar over the page would cover it, they stay in the panel.
+  const narrowScreen = () => !!(window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+  function placeProps(){
+    const box = $("eprops"), want = narrowScreen() ? document.querySelector(".ctlcol") : eStage;
+    if (box.parentElement === want) return;
+    if (want === eStage) eStage.appendChild(box);
+    else want.insertBefore(box, $("fpanel"));
+    box.style.left = box.style.top = "";
+  }
+  function positionProps(){
+    const box = $("eprops");
+    if (box.hidden || box.parentElement !== eStage) return;
+    const el = eLayer.querySelector(".eobj.sel");
+    if (!el) return;
+    const gap = 10, w = box.offsetWidth, h = box.offsetHeight, sw = eStage.clientWidth;
+    let top = el.offsetTop - h - gap;
+    if (top < 4) top = el.offsetTop + el.offsetHeight + gap;      // no room above: sit below
+    const left = Math.max(4, Math.min(el.offsetLeft, sw - w - 4));
+    box.style.left = left + "px"; box.style.top = Math.max(4, top) + "px";
+  }
+  ["pointerdown", "click", "dblclick"].forEach(t => $("eprops").addEventListener(t, e => e.stopPropagation()));
+  window.matchMedia && window.matchMedia("(max-width: 760px)").addEventListener("change", () => { placeProps(); positionProps(); });
+  function renderProps(){ placeProps(); renderPropsInner(); positionProps(); }
+  function renderPropsInner(){
     const box = $("eprops");
     const o = ed.objs.find(x => x.id === ed.sel);
     const active = document.activeElement && document.activeElement.id;
@@ -3126,7 +3204,7 @@ else if (typeof exports === 'object')
     // Text editing happens on the page and in the ribbon, so the side panel only opens for
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
-    const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" ||
+    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) || ed.mode === "form" ||
                        textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
     // contextual panels float over the page edge instead of taking a column, so the page
     // keeps its width whether or not one is showing
@@ -3692,6 +3770,7 @@ else if (typeof exports === 'object')
       const view = await openPdfJs(info.bytes);
       if (token !== ed.loadToken) { view.destroy().catch(() => {}); return; }
       ed.view = view;
+      find.index = null; find.indexToken++; find.matches = []; find.cur = -1;
       const wasOn = ed.page || 0, keepPage = info.keepPage;
       ed.pageCount = ed.view.numPages;
       ed.page = keepPage && wasOn < ed.pageCount ? wasOn : 0;
@@ -4970,6 +5049,132 @@ else if (typeof exports === 'object')
     b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
     b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
   });
+  // ---------- Find in the document ----------
+  // Every page's text is read once (through the same reader that draws the page) and searched
+  // as plain strings, so matches can cross the pieces a line is drawn in. Hits are highlighted
+  // on the page in every mode, and Enter steps through them, across pages.
+  const find = { open: false, query: "", index: null, indexToken: 0, matches: [], cur: -1, runToken: 0 };
+  async function buildFindIndex(){
+    if (find.index) return find.index;
+    const token = ++find.indexToken, view = ed.view, pages = [];
+    for (let i = 1; i <= view.numPages; i++) {
+      const content = await (await view.getPage(i)).getTextContent();
+      const items = content.items.filter(it => typeof it.str === "string");
+      let full = ""; const spans = [];
+      items.forEach(it => {
+        const size = Math.hypot(it.transform[0], it.transform[1]) || 10;
+        const x = it.transform[4], y = it.transform[5], len = it.str.length;
+        const w = it.width > 0 ? it.width : size * 0.5 * len;
+        const prev = spans[spans.length - 1];
+        // pieces of one line touch; a gap, a line end or a new baseline means a space
+        if (prev && full && !/\s$/.test(full) && !/^\s/.test(it.str) &&
+            (prev.eol || x - (prev.x + prev.w) > size * 0.15 || Math.abs(y - prev.y) > size * 0.5)) full += " ";
+        const start = full.length; full += it.str;
+        const st = content.styles && content.styles[it.fontName];
+        spans.push({ start, end: full.length, x, y, w, size, len, eol: !!it.hasEOL, str: it.str, family: (st && st.fontFamily) || "sans-serif" });
+      });
+      pages.push({ full, spans });
+      if (token !== find.indexToken || view !== ed.view) return null;     // the document changed underneath
+    }
+    find.index = pages;
+    return pages;
+  }
+  // Where inside a piece of text a match begins depends on the glyph widths, which differ a lot
+  // in a proportional font, so the pieces are measured rather than split by character count.
+  const findCtx = document.createElement("canvas").getContext("2d");
+  function findRects(pg, s, e){
+    const out = [];
+    pg.spans.forEach(sp => {
+      if (!sp.len || sp.end <= s || sp.start >= e) return;
+      const a = Math.max(s, sp.start) - sp.start, z = Math.min(e, sp.end) - sp.start;
+      let f0 = a / sp.len, f1 = z / sp.len;
+      try {
+        findCtx.font = "100px " + sp.family;
+        const whole = findCtx.measureText(sp.str).width;
+        if (whole > 0) { f0 = findCtx.measureText(sp.str.slice(0, a)).width / whole; f1 = findCtx.measureText(sp.str.slice(0, z)).width / whole; }
+      } catch (err) { /* keep the even split */ }
+      out.push({ x: sp.x + sp.w * f0, y: sp.y - sp.size * 0.22, w: Math.max(1, sp.w * (f1 - f0)), h: sp.size * 1.15 });
+    });
+    return out;
+  }
+  function findAll(pages, q){
+    const out = [];
+    pages.forEach((pg, pi) => {
+      let hay = pg.full.toLowerCase(), nd = q.toLowerCase();
+      if (hay.length !== pg.full.length) { hay = pg.full; nd = q; }       // case folding changed the length: stay exact
+      for (let from = 0, i; out.length < 3000 && (i = hay.indexOf(nd, from)) >= 0; from = i + Math.max(1, nd.length))
+        out.push({ page: pi, rects: findRects(pg, i, i + nd.length) });
+    });
+    return out;
+  }
+  function drawFindMarks(){
+    if (!find.open || !find.matches.length || !ed.vp) return;
+    find.matches.forEach((m, mi) => {
+      if (m.page !== ed.page) return;
+      m.rects.forEach(r => {
+        const q = ed.vp.convertToViewportRectangle([r.x, r.y, r.x + r.w, r.y + r.h]);
+        const el = document.createElement("div");
+        el.className = "fhit" + (mi === find.cur ? " cur" : "");
+        el.style.left = Math.min(q[0], q[2]) + "px"; el.style.top = Math.min(q[1], q[3]) + "px";
+        el.style.width = Math.abs(q[2] - q[0]) + "px"; el.style.height = Math.abs(q[3] - q[1]) + "px";
+        eLayer.appendChild(el);
+      });
+    });
+  }
+  function findCount(text){ $("find-count").textContent = text; }
+  async function findGo(i){
+    const n = find.matches.length; if (!n) return;
+    find.cur = (i + n) % n;
+    const m = find.matches[find.cur];
+    if (m.page !== ed.page) { ed.page = m.page; ed.sel = null; await editRender(); } else drawLayer();
+    findCount((find.cur + 1) + " of " + n + (n >= 3000 ? "+" : ""));
+    const hit = eLayer.querySelector(".fhit.cur");
+    if (hit && hit.scrollIntoView) hit.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }
+  async function runFind(){
+    const q = $("find-input").value, token = ++find.runToken;
+    find.query = q;
+    if (!q) { find.matches = []; find.cur = -1; findCount(""); drawLayer(); return; }
+    if (!find.index) findCount("Searching\u2026");
+    const pages = await buildFindIndex();
+    if (!pages || token !== find.runToken) return;
+    find.matches = findAll(pages, q);
+    if (!find.matches.length) {
+      find.cur = -1; drawLayer();
+      findCount(pages.some(p => p.full.trim()) ? "No matches" : "No text to search");
+      return;
+    }
+    // start from the first hit on this page or after it
+    const first = find.matches.findIndex(m => m.page >= ed.page);
+    await findGo(first < 0 ? 0 : first);
+  }
+  function openFind(){
+    if (!ed.view) return;
+    find.open = true; $("findbar").hidden = false;
+    const inp = $("find-input"); inp.focus(); inp.select();
+    if (inp.value) runFind();
+  }
+  function closeFind(){
+    find.open = false; $("findbar").hidden = true; find.runToken++;
+    drawLayer();
+  }
+  let findTimer = null;
+  $("find-input").addEventListener("input", () => { clearTimeout(findTimer); findTimer = setTimeout(runFind, 160); });
+  $("find-input").addEventListener("keydown", ev => {
+    if (ev.key === "Enter") { ev.preventDefault(); findGo(find.cur + (ev.shiftKey ? -1 : 1)); }
+    else if (ev.key === "Escape") { ev.preventDefault(); closeFind(); }
+    ev.stopPropagation();                 // typing here is not a page shortcut
+  });
+  $("find-next").addEventListener("click", () => findGo(find.cur + 1));
+  $("find-prev").addEventListener("click", () => findGo(find.cur - 1));
+  $("find-close").addEventListener("click", closeFind);
+  $("e-find").addEventListener("click", () => { find.open ? closeFind() : openFind(); });
+  document.addEventListener("keydown", ev => {
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== "f") return;
+    if (!ed.view || $("edit-work").hidden || !$("panel-document").classList.contains("active")) return;
+    ev.preventDefault(); openFind();       // Ctrl/Cmd+F searches the document, not the web page
+  });
+
   // Reading comes first on a phone: the ribbon starts tucked away there unless it was left open
   { let saved = null; try { saved = localStorage.getItem("pdf-tools:ribbon-collapsed"); } catch (e) {}
     const narrow = window.matchMedia && window.matchMedia("(max-width: 760px)").matches;
