@@ -72,5 +72,13 @@ else
   echo "Skipped the tests. Run ./build.sh without --no-test before publishing."
 fi
 
+# GitHub Pages serves the repo root, so keep the published copies there in step with dist/.
+# sw.js matters most: its cache name changes with every build, and that change is what makes
+# a browser that already has the app fetch the new page instead of serving the cached one.
+if [[ "${SYNC_ROOT:-1}" == "1" && -f index.html && -f sw.js ]]; then
+  for f in index.html sw.js manifest.webmanifest icon.svg icon-maskable.svg; do cp "dist/$f" "$f"; done
+  echo "==> synced the site files to the repo root"
+fi
+
 echo
 echo "Publish dist/ for the site. Hand out dist/pdf-tool-kit.html for offline use."

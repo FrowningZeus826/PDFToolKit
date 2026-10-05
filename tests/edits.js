@@ -813,7 +813,7 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      const lum=c=>{const m=(c||'').match(/[\d.]+/g); if(!m) return null; const [r,g,b]=m.map(Number); return 0.2126*r+0.7152*g+0.0722*b;};
      const solid=el=>{ let e=el; while(e){ const c=getComputedStyle(e).backgroundColor; if(c && !/rgba\(0, 0, 0, 0\)|transparent/.test(c)) return c; e=e.parentElement; } return 'rgb(255,255,255)'; };
      const out=[];
-     document.querySelectorAll('#annot-tools .tlabel, .btn, .primary, .segbtn, .tool, .dfname, .zoomval, #docbar-steps, #docbar-name, .sub, .hint').forEach(el=>{
+     document.querySelectorAll('#annot-tools .tlabel, .btn, .primary, .segbtn, .tool, .dfname, .zoomval, .rsummary, .ribbon-note, #docbar-steps, #docbar-name, .sub, .hint').forEach(el=>{
        if(!el.offsetParent && el.className!=='tlabel') return;
        const s=getComputedStyle(el); const f=lum(s.color), bg=lum(solid(el));
        if(f!==null && bg!==null && Math.abs(f-bg)<40) out.push((el.id||el.className)+' fg='+s.color+' bg='+solid(el));
@@ -831,8 +831,35 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
  check('tools: picking another tool closes the signature panel and disarms it',
    (await p.$eval('#sigbox',e=>e.hidden)) && !(await p.evaluate(()=>document.getElementById('sig-tool').classList.contains('active')))
    && (await p.evaluate(()=>document.querySelector('.tool[data-tool=text]').classList.contains('active'))));
- { const st=await p.evaluate(()=>{const strip=+getComputedStyle(document.querySelector('.toolstrip')).zIndex, stage=+getComputedStyle(document.querySelector('.stagecol')).zIndex, lab=+getComputedStyle(document.querySelector('#annot-tools .tlabel')).zIndex; return {strip,stage,lab};});
-   check('tools: tooltips stack above the page', st.strip>st.stage && st.lab>st.stage, JSON.stringify(st)); }
+ // ---- the ribbon: one place for every mode, with the page keeping the full width ----
+ { const tools=await p.$$eval('#annot-tools .tool',ts=>ts.map(t=>t.dataset.tool||t.id));
+   check('ribbon: every Add-to-page tool is still there', ['text','date','check','cross','hl','box','white','signature','tool-image'].every(t=>tools.includes(t)), tools.join(','));
+   const labels=await p.$$eval('#annot-tools .tlabel',ls=>ls.map(l=>{const r=l.getBoundingClientRect(), cs=getComputedStyle(l); return r.width>0&&r.height>0&&+cs.opacity===1&&l.textContent.trim().length>0;}));
+   check('ribbon: each tool shows its label, not only on hover', labels.length>=9 && labels.every(Boolean), JSON.stringify(labels));
+   const modes=await p.$$eval('#edit-modes .segbtn',bs=>bs.map(b=>b.dataset.emode));
+   check('ribbon: the five modes are tabs of one ribbon', modes.join(',')==='annotate,form,text,redact,doc' && !!(await p.$('#docribbon #edit-modes')), modes.join(','));
+   const panes={annotate:'rp-annotate',text:'tx-ribbon',redact:'rd-ribbon',doc:'edit-docopts'}; const seen=[];
+   for (const [m,id] of Object.entries(panes)) {
+     await p.evaluate(m=>document.querySelector('#edit-modes .segbtn[data-emode='+m+']').click(),m); await sleep(500);
+     const vis=await p.$$eval('#rbody > .rpane',ps=>ps.filter(e=>!e.hidden&&e.offsetParent).map(e=>e.id));
+     seen.push(m+':'+vis.join('+')); if (vis.join()!==id) { check('ribbon: '+m+' tab shows only its own controls', false, vis.join()+' (wanted '+id+')'); }
+   }
+   check('ribbon: each tab shows only its own controls', seen.every(x=>{const [m,v]=x.split(':'); return v===panes[m];}), seen.join(' | '));
+   await p.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=annotate]').click()); await sleep(500);
+   const g=await p.evaluate(()=>{const r=document.getElementById('docribbon').getBoundingClientRect(), st=document.querySelector('.stagecol').getBoundingClientRect(); return {ribbon:Math.round(r.height), page:Math.round(st.width), vw:innerWidth};});
+   check('ribbon: compact, and the page column is the full width', g.ribbon<=130 && g.page>=g.vw*0.7, JSON.stringify(g));
+   await p.evaluate(()=>document.getElementById('sig-tool').click()); await sleep(500);
+   const g2=await p.evaluate(()=>{const st=document.querySelector('.stagecol').getBoundingClientRect(), c=document.querySelector('.ctlcol').getBoundingClientRect(), mid=document.elementFromPoint(c.left+c.width/2,c.top+30); return {page:Math.round(st.width), floats:getComputedStyle(document.querySelector('.ctlcol')).position==='fixed', on_top:!!(mid&&mid.closest('.ctlcol'))};});
+   check('ribbon: the signature panel floats over the page instead of narrowing it', g2.floats && g2.on_top && g2.page===g.page, JSON.stringify(g2));
+   await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await sleep(300);
+   // collapsing for reading
+   const h0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().height));
+   await p.evaluate(()=>document.getElementById('rb-collapse').click()); await sleep(900);
+   const c1=await p.evaluate(()=>({exp:document.getElementById('rb-collapse').getAttribute('aria-expanded'), body:getComputedStyle(document.getElementById('rbody')).display, tabs:!!document.querySelector('.rtabs'), h:Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().height)}));
+   check('ribbon: collapsing hides the controls and gives the page more room', c1.exp==='false' && c1.body==='none' && c1.tabs && c1.h>h0, JSON.stringify({h0,...c1}));
+   await p.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=text]').click()); await sleep(700);
+   check('ribbon: choosing a tab opens it again', (await p.$eval('#rb-collapse',e=>e.getAttribute('aria-expanded')))==='true' && !(await p.$eval('#tx-ribbon',e=>e.hidden)));
+   await p.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=annotate]').click()); await sleep(500); }
  await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await sleep(200);
 
  // ---- Fill form ----

@@ -80,44 +80,37 @@
           <div class="trust"><strong>Nothing leaves this device.</strong> Every file is opened and processed inside your browser. No uploads, no server, no tracking. Closing this tab clears everything.</div>
         </div>
         <div id="edit-work" hidden>
-          <div class="seg" id="edit-modes" role="tablist" aria-label="Edit mode" style="margin-top:6px;">
+          <div class="docribbon" id="docribbon">
+            <div class="rtabs">
+              <div class="rtablist" id="edit-modes" role="tablist" aria-label="Edit mode">
             <button class="segbtn active" role="tab" aria-selected="true" data-emode="annotate">Add to page</button>
             <button class="segbtn" role="tab" aria-selected="false" data-emode="form">Fill form <span id="edit-fieldcount"></span></button>
             <button class="segbtn" role="tab" aria-selected="false" data-emode="text">Edit text</button>
             <button class="segbtn" role="tab" aria-selected="false" data-emode="redact">Redact</button>
             <button class="segbtn" role="tab" aria-selected="false" data-emode="doc">Whole document</button>
           </div>
-          
-          
-          <div id="edit-docopts" hidden>
-            <div class="checkline"><input type="checkbox" id="wm-on"><label for="wm-on"><b>Watermark</b></label></div>
-            <div class="row2">
-              <div><label class="field-label" for="wm-text">Text</label><input type="text" id="wm-text" maxlength="60" placeholder="e.g. CONFIDENTIAL"></div>
-              <div><label class="field-label" for="wm-style">Placement</label>
-                <select id="wm-style"><option value="diagonal" selected>Diagonal across the page</option><option value="top">Across the top</option><option value="bottom">Across the bottom</option></select></div>
+              <div class="viewer-bar rtools">
+              <div class="grp nav">
+                <button class="btn icon" id="e-prev" aria-label="Previous page" title="Previous page">&lsaquo;</button>
+                <span class="pg" id="e-label">Page 1 of 1</span>
+                <button class="btn icon" id="e-next" aria-label="Next page" title="Next page">&rsaquo;</button>
+              </div>
+              <div class="grp zoom">
+                <button class="btn icon" id="e-zout" aria-label="Zoom out" title="Zoom out">&minus;</button>
+                <span class="zoomval" id="e-zoom">Fit</span>
+                <button class="btn icon" id="e-zin" aria-label="Zoom in" title="Zoom in">+</button>
+                <button class="btn" id="e-fit" title="Switch between fitting the whole page and filling the width">Width</button>
+              </div>
+              <div class="grp file">
+                <span class="dfname" id="edit-name"></span>
+                <label class="btn" id="edit-open" tabindex="0" role="button" title="Open another PDF">Open<input type="file" id="edit-input2" class="vh" accept="application/pdf,.pdf"></label>
+                <button class="btn icon" id="rb-collapse" aria-expanded="true" aria-controls="rbody" title="Hide the ribbon to read" aria-label="Hide the ribbon">&#8963;</button>
+              </div>
             </div>
-            <div class="row2">
-              <div><label class="field-label" for="wm-color">Color</label>
-                <select id="wm-color"><option value="#808080" selected>Gray</option><option value="#B3261E">Red</option><option value="#1E3A8A">Blue</option><option value="#000000">Black</option></select></div>
-              <div><label class="field-label" for="wm-opacity">Strength</label>
-                <div class="size-row"><input type="range" id="wm-opacity" min="10" max="80" step="5" value="25"><span id="wm-opv">25%</span></div></div>
             </div>
-            <div class="checkline" style="margin-top:14px;"><input type="checkbox" id="pn-on"><label for="pn-on"><b>Page numbers</b></label></div>
-            <div class="row2">
-              <div><label class="field-label" for="pn-format">Format</label>
-                <select id="pn-format"><option value="n">1</option><option value="page">Page 1</option><option value="pageof" selected>Page 1 of 10</option><option value="dash">&ndash; 1 &ndash;</option></select></div>
-              <div><label class="field-label" for="pn-pos">Position</label>
-                <select id="pn-pos"><option value="bottom-center" selected>Bottom centre</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-center">Top centre</option></select></div>
-            </div>
-            <div class="row2">
-              <div><label class="field-label" for="pn-start">Start at</label><input type="number" id="pn-start" min="1" max="9999" value="1"></div>
-              <div><div class="checkline" style="margin-top:26px;"><input type="checkbox" id="pn-skip1"><label for="pn-skip1">Skip the first page (cover)</label></div></div>
-            </div>
-            <div class="hint">Applies to every page. Flip through the pages above to check the placement.</div>
-          </div>
-          <div class="workarea" id="workarea">
-          <div class="toolstrip">
-          <div class="toolrow" id="annot-tools" role="toolbar" aria-label="Add to page">
+            <div class="rbody" id="rbody">
+              <div class="rpane" id="rp-annotate">
+            <div class="toolrow" id="annot-tools" role="toolbar" aria-label="Add to page">
             <button class="tool" data-tool="text" title="Text" aria-label="Text"><svg viewBox="0 0 24 24"><path d="M5 5h14M12 5v14M9 19h6"/></svg><span class="tlabel">Text</span></button>
             <button class="tool" data-tool="date" title="Date" aria-label="Date"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="tlabel">Date</span></button>
             <button class="tool" data-tool="check" title="Check" aria-label="Check"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg><span class="tlabel">Check</span></button>
@@ -128,10 +121,16 @@
             <button class="tool" id="sig-tool" data-tool="signature" title="Signature" aria-label="Signature"><svg viewBox="0 0 24 24"><path d="M3 18c3-1 5-4 7-8s4-6 6-6 2 2 0 4-6 5-6 8 3 2 5 0"/><path d="M14 20h7"/></svg><span class="tlabel">Signature</span></button>
             <label class="tool" id="tool-image" tabindex="0" role="button" title="Image" aria-label="Image"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg><span class="tlabel">Image</span><input type="file" id="edit-img-input" class="vh" accept="image/png,image/jpeg"></label>
           </div>
-
+            <div class="ribbon-note" id="edit-hint"></div>
           </div>
-          <div class="stagecol">
-          <div class="ribbon" id="tx-ribbon" hidden>
+              <div class="rpane" id="rp-form" hidden>
+            <span class="ribbon-note" id="rp-form-note">Tap a field on the page to fill it, or step through them with Previous and Next.</span>
+            <div class="checkline" id="flatten-line" hidden>
+            <input type="checkbox" id="f-flatten">
+            <label for="f-flatten">Lock the answers (flatten the form) so they can't be changed later</label>
+          </div>
+          </div>
+              <div class="rpane" id="tx-ribbon" hidden>
             <div class="ribbon-group" role="group" aria-label="Grouping">
               <span class="ribbon-title">Grouping</span>
               <label class="groupctl" for="tx-group">
@@ -153,7 +152,7 @@
             </div>
             <span class="ribbon-note" id="rb-note"></span>
           </div>
-          <div class="ribbon" id="rd-ribbon" hidden>
+              <div class="rpane" id="rd-ribbon" hidden>
             <div class="ribbon-group" role="group" aria-label="Redaction">
               <span class="ribbon-title">Redact</span>
               <label class="ribbon-field" for="rd-mark">Leave the area
@@ -169,30 +168,39 @@
               <span id="rd-count"></span>
               <span class="muted" id="rd-total"></span>
             </div>
-            <span class="ribbon-note" id="rd-note">Drag a box over anything that must go. The text underneath is <b>deleted from the file</b>, not covered, so it can&rsquo;t be copied back out. Pictures and scanned pages are not touched &mdash; black those out or flatten the page yourself, and check the result before sharing.</span>
+            <span class="ribbon-note" id="rd-note">The text under a marked area is <b>deleted from the file</b>, not just covered. Pictures and scanned pages are not touched &mdash; check the result before sharing.</span>
           </div>
-            <div class="viewer-bar">
-              <div class="grp nav">
-                <button class="btn icon" id="e-prev" aria-label="Previous page" title="Previous page">&lsaquo;</button>
-                <span class="pg" id="e-label">Page 1 of 1</span>
-                <button class="btn icon" id="e-next" aria-label="Next page" title="Next page">&rsaquo;</button>
-              </div>
-              <div class="grp zoom">
-                <button class="btn icon" id="e-zout" aria-label="Zoom out" title="Zoom out">&minus;</button>
-                <span class="zoomval" id="e-zoom">Fit</span>
-                <button class="btn icon" id="e-zin" aria-label="Zoom in" title="Zoom in">+</button>
-                <button class="btn" id="e-fit" title="Switch between fitting the whole page and filling the width">Width</button>
-              </div>
-              <div class="grp file">
-                <span class="dfname" id="edit-name"></span>
-                <label class="btn" id="edit-open" tabindex="0" role="button" title="Open another PDF">Open<input type="file" id="edit-input2" class="vh" accept="application/pdf,.pdf"></label>
+              <div class="rpane" id="edit-docopts" hidden>
+            <div class="ribbon-group" role="group" aria-label="Watermark">
+              <span class="checkline"><input type="checkbox" id="wm-on"><label for="wm-on"><b>Watermark</b></label></span>
+              <label class="ribbon-field" for="wm-text">Text <input type="text" id="wm-text" maxlength="60" placeholder="e.g. CONFIDENTIAL"></label>
+              <label class="ribbon-field" for="wm-style">Placement <select id="wm-style"><option value="diagonal" selected>Diagonal across the page</option><option value="top">Across the top</option><option value="bottom">Across the bottom</option></select></label>
+              <label class="ribbon-field" for="wm-color">Color <select id="wm-color"><option value="#808080" selected>Gray</option><option value="#B3261E">Red</option><option value="#1E3A8A">Blue</option><option value="#000000">Black</option></select></label>
+              <label class="ribbon-field" for="wm-opacity">Strength <input type="range" id="wm-opacity" min="10" max="80" step="5" value="25"><span id="wm-opv">25%</span></label>
+            </div>
+            <span class="ribbon-sep"></span>
+            <div class="ribbon-group" role="group" aria-label="Page numbers">
+              <span class="checkline"><input type="checkbox" id="pn-on"><label for="pn-on"><b>Page numbers</b></label></span>
+              <label class="ribbon-field" for="pn-format">Format <select id="pn-format"><option value="n">1</option><option value="page">Page 1</option><option value="pageof" selected>Page 1 of 10</option><option value="dash">&ndash; 1 &ndash;</option></select></label>
+              <label class="ribbon-field" for="pn-pos">Position <select id="pn-pos"><option value="bottom-center" selected>Bottom centre</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-center">Top centre</option></select></label>
+              <label class="ribbon-field" for="pn-start">Start at <input type="number" id="pn-start" min="1" max="9999" value="1"></label>
+              <span class="checkline"><input type="checkbox" id="pn-skip1"><label for="pn-skip1">Skip the first page</label></span>
+            </div>
+            <span class="ribbon-note">Applies to every page. Flip through the pages to check the placement.</span>
+          </div>
+              <div class="rapply" id="rapply">
+                <div class="count rsummary" id="edit-summary"></div>
+                <button class="btn strong rgo" id="edit-go" disabled>Apply changes</button>
               </div>
             </div>
-            <div class="stage-wrap">
+          </div>
+          <div class="workarea" id="workarea">
+            <div class="stagecol">
+              <div class="stage-wrap">
               <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div></div>
             </div>
-          </div>
-          <div class="ctlcol">
+            </div>
+            <div class="ctlcol">
 <div id="edit-textpanel" hidden>
             <div class="props">
               <div id="tx-locked" hidden>
@@ -258,9 +266,8 @@
           </div>
         </div>
           </div>
-          <div class="hint" id="edit-hint" style="margin-bottom:10px;"></div>
-          <div class="props" id="eprops" hidden></div>
-          <div class="props" id="fpanel" hidden>
+<div class="props" id="eprops" hidden></div>
+<div class="props" id="fpanel" hidden>
             <div class="prophead"><b id="f-label"></b><span class="muted" id="f-pos"></span></div>
             <div id="f-input"></div>
             <div class="fnav">
@@ -268,14 +275,9 @@
               <button class="btn strong" id="f-next">Next field &rsaquo;</button>
             </div>
           </div>
-          <div class="checkline" id="flatten-line" hidden>
-            <input type="checkbox" id="f-flatten">
-            <label for="f-flatten">Lock the answers (flatten the form) so they can't be changed later</label>
+            </div>
           </div>
-          <div class="count" id="edit-summary"></div>
-          </div></div>
         </div>
-        <button class="primary" id="edit-go" disabled>Apply changes</button>
         <div class="status" id="edit-status" role="status"></div>
       </div>
     </section>

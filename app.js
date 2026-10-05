@@ -1765,10 +1765,11 @@
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
     const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" ||
                        textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
-    const wa = $("workarea"), had = wa.classList.contains("has-props");
-    wa.classList.toggle("has-props", !!needsProps);
-    // the page column changes width when that column appears, so re-fit the page
-    if (had !== !!needsProps && ed.view) requestAnimationFrame(() => editRender());
+    // contextual panels float over the page edge instead of taking a column, so the page
+    // keeps its width whether or not one is showing
+    $("workarea").classList.toggle("has-props", !!needsProps);
+    $("rp-annotate").hidden = ed.mode !== "annotate";
+    $("rp-form").hidden = ed.mode !== "form";
     $("edit-docopts").hidden = ed.mode !== "doc";
     $("edit-textpanel").hidden = ed.mode !== "text";
     const rib = $("tx-ribbon");
@@ -3584,6 +3585,32 @@
     $("rd-clear").disabled = !(ed.redactions || []).length;
   }
   $("rd-clear").addEventListener("click", () => { ed.redactions = []; drawLayer(); editUi(); });
+
+  // The ribbon can be tucked away to leave the page alone for reading. Clicking a tab opens
+  // it again, as in a word processor, and double-clicking the open tab closes it.
+  function setRibbonCollapsed(on, remember){
+    const rib = $("docribbon"), btn = $("rb-collapse");
+    if (!rib || !btn) return;
+    rib.classList.toggle("collapsed", on);
+    // Apply travels with the ribbon: down in the body when it is open, up beside the tabs
+    // when it is tucked away, so pending changes can always be applied
+    (on ? rib.querySelector(".rtabs") : $("rbody")).appendChild($("rapply"));
+    btn.setAttribute("aria-expanded", on ? "false" : "true");
+    btn.title = on ? "Show the ribbon" : "Hide the ribbon to read";
+    btn.setAttribute("aria-label", btn.title);
+    btn.innerHTML = on ? "&#8964;" : "&#8963;";
+    if (remember) { try { localStorage.setItem("pdf-tools:ribbon-collapsed", on ? "1" : "0"); } catch (e) {} }
+    if (ed.view) requestAnimationFrame(() => editRender());     // the page re-fits the space it now has
+  }
+  $("rb-collapse").addEventListener("click", () => setRibbonCollapsed(!$("docribbon").classList.contains("collapsed"), true));
+  document.querySelectorAll("#edit-modes .segbtn").forEach(b => {
+    b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
+    b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
+  });
+  // Reading comes first on a phone: the ribbon starts tucked away there unless it was left open
+  { let saved = null; try { saved = localStorage.getItem("pdf-tools:ribbon-collapsed"); } catch (e) {}
+    const narrow = window.matchMedia && window.matchMedia("(max-width: 760px)").matches;
+    if (saved === "1" || (saved === null && narrow)) setRibbonCollapsed(true, false); }
 
   // Delete the text a redaction covers, put back whatever part of a line survives outside
   // it, then paint the box. The order matters: the box is only ever a visual marker.
