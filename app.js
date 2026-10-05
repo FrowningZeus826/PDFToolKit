@@ -1428,6 +1428,7 @@
         clampObj(o);
         if (resizing && o.type === "text") { drawLayer(); return; }
         Object.assign(target.style, { left: o.x * s + "px", top: o.y * s + "px", width: o.w * s + "px", height: o.h * s + "px" });
+        positionProps();
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
@@ -1596,7 +1597,32 @@
     return row;
   }
 
-  function renderProps(){
+  // The selected object's controls ride next to the object, above it or below it when there is
+  // no room, so nothing is added to the ribbon and the page does not move when you select
+  // something. On a phone, where a bar over the page would cover it, they stay in the panel.
+  const narrowScreen = () => !!(window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+  function placeProps(){
+    const box = $("eprops"), want = narrowScreen() ? document.querySelector(".ctlcol") : eStage;
+    if (box.parentElement === want) return;
+    if (want === eStage) eStage.appendChild(box);
+    else want.insertBefore(box, $("fpanel"));
+    box.style.left = box.style.top = "";
+  }
+  function positionProps(){
+    const box = $("eprops");
+    if (box.hidden || box.parentElement !== eStage) return;
+    const el = eLayer.querySelector(".eobj.sel");
+    if (!el) return;
+    const gap = 10, w = box.offsetWidth, h = box.offsetHeight, sw = eStage.clientWidth;
+    let top = el.offsetTop - h - gap;
+    if (top < 4) top = el.offsetTop + el.offsetHeight + gap;      // no room above: sit below
+    const left = Math.max(4, Math.min(el.offsetLeft, sw - w - 4));
+    box.style.left = left + "px"; box.style.top = Math.max(4, top) + "px";
+  }
+  ["pointerdown", "click", "dblclick"].forEach(t => $("eprops").addEventListener(t, e => e.stopPropagation()));
+  window.matchMedia && window.matchMedia("(max-width: 760px)").addEventListener("change", () => { placeProps(); positionProps(); });
+  function renderProps(){ placeProps(); renderPropsInner(); positionProps(); }
+  function renderPropsInner(){
     const box = $("eprops");
     const o = ed.objs.find(x => x.id === ed.sel);
     const active = document.activeElement && document.activeElement.id;
@@ -1776,7 +1802,7 @@
     // Text editing happens on the page and in the ribbon, so the side panel only opens for
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
-    const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" ||
+    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) || ed.mode === "form" ||
                        textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
     // contextual panels float over the page edge instead of taking a column, so the page
     // keeps its width whether or not one is showing

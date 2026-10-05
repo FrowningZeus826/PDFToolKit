@@ -864,6 +864,28 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      await p.keyboard.down('Control'); await p.keyboard.press('s'); await p.keyboard.up('Control');
      const dls=await H.takeDownloads(p,1).catch(()=>[]);
      check('header: Ctrl+S downloads the document', dls.length===1 && dls[0].buf.slice(0,5).toString()==='%PDF-', dls.length+' download(s)'); }
+   // the selected object's controls ride next to the object, not in the ribbon or a side column
+   { await p.evaluate(()=>window.scrollTo(0,0)); await sleep(150);
+     const rb0=await p.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height)), pg0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().top));
+     await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=box]').click());
+     const sb=await (await p.$('#estage')).boundingBox(); await p.mouse.click(sb.x+sb.width*0.5, sb.y+sb.height*0.6); await sleep(600);
+     const g=await p.evaluate(()=>{const bar=document.getElementById('eprops'), o=document.querySelector('.eobj.sel'), br=bar.getBoundingClientRect(), or=o.getBoundingClientRect();
+       return {parent:bar.parentElement.id, hidden:bar.hidden, near:Math.min(Math.abs(br.bottom-or.top), Math.abs(br.top-or.bottom))<=24, overlapsObj:!(br.bottom<=or.top||br.top>=or.bottom||br.right<=or.left||br.left>=or.right),
+         sidePanel:document.getElementById('workarea').classList.contains('has-props'), ribbon:Math.round(document.getElementById('docribbon').getBoundingClientRect().height), pageTop:Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().top), n:document.querySelectorAll('.eobj').length};});
+     check('props: the controls sit next to the selected object, not over it', g.parent==='estage' && !g.hidden && g.near && !g.overlapsObj, JSON.stringify(g));
+     check('props: selecting an object adds nothing to the ribbon and moves nothing', !g.sidePanel && g.ribbon===rb0 && g.pageTop===pg0, JSON.stringify({rb0,pg0,...g}));
+     // pressing inside the bar must not fall through to the page and deselect the object
+     const cr=await (await p.$('#eprops .colorchip[title=Red]')).boundingBox(); await p.mouse.click(cr.x+cr.width/2, cr.y+cr.height/2); await sleep(400);
+     const after=await p.evaluate(()=>({n:document.querySelectorAll('.eobj').length, sel:!!document.querySelector('.eobj.sel'), hidden:document.getElementById('eprops').hidden}));
+     check('props: clicking inside the bar keeps the selection', after.n===g.n && after.sel && !after.hidden, JSON.stringify(after));
+     await p.evaluate(()=>document.querySelector('#eprops .prophead .btn').click()); await sleep(300);
+     check('props: Delete in the bar removes the object and the bar goes away', (await p.$$('.eobj')).length===g.n-1 && await p.$eval('#eprops',e=>e.hidden)); }
+   { const mp=(await H.newPage(b,H.LOCAL,true)); await upload(mp.p,'#edit-input',FX('a.pdf')); await mp.p.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
+     await mp.p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=box]').click());
+     const mb=await (await mp.p.$('#estage')).boundingBox(); await mp.p.mouse.click(mb.x+mb.width*0.5, mb.y+mb.height*0.4); await sleep(600);
+     const m=await mp.p.evaluate(()=>({parent:document.getElementById('eprops').parentElement.className, hidden:document.getElementById('eprops').hidden}));
+     check('props: on a phone the controls stay in the panel instead of covering the page', m.parent==='ctlcol' && !m.hidden, JSON.stringify(m));
+     await mp.p.close(); }
    // collapsing for reading
    const h0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().height));
    await p.evaluate(()=>document.getElementById('rb-collapse').click()); await sleep(900);

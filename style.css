@@ -278,6 +278,17 @@
   .docribbon.collapsed ~ .workarea .ctlcol { top: calc(var(--hdr, 47px) + 64px); }
   .workarea:not(.has-props) .ctlcol { display: none; }
   .ctlcol .props:first-child { margin-top: 0; }
+  /* the selected object's controls: a small bar attached to the object, over the page */
+  #estage > #eprops { position: absolute; z-index: 60; margin: 0; padding: 6px 10px; line-height: normal; width: max-content;
+    max-width: min(640px, calc(100% - 8px)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+    box-shadow: 0 6px 22px rgba(0,0,0,.24); border-radius: 8px; cursor: default; }
+  #estage > #eprops[hidden] { display: none; }
+  #estage > #eprops .prophead { margin: 0; gap: 10px; }
+  #estage > #eprops .proprow { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+  #estage > #eprops textarea { width: 230px; height: 56px; min-height: 0; padding: 5px 7px; font-size: 13px; }
+  #estage > #eprops select { width: auto; max-width: 180px; padding: 4px 6px; font-size: 13px; }
+  #estage > #eprops input[type=range] { width: 90px; }
+  #estage > #eprops .warnline { flex: 1 1 100%; margin: 0; }
   /* Word-style tool buttons: icon over a label */
   #annot-tools { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; }
   #annot-tools .tool { flex-direction: column; justify-content: center; gap: 3px; width: 56px; height: 50px; padding: 4px 2px 3px;

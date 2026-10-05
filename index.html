@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-a2L1IybM2Kif39d7Q+o4xew3owF2+iwS2FmN9BAWKqY=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-Vjkx9ous3Q6ziKCgWmuaiiR9HGghJFXHGSd/OKZIQ1k=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -288,6 +288,17 @@
   .docribbon.collapsed ~ .workarea .ctlcol { top: calc(var(--hdr, 47px) + 64px); }
   .workarea:not(.has-props) .ctlcol { display: none; }
   .ctlcol .props:first-child { margin-top: 0; }
+  /* the selected object's controls: a small bar attached to the object, over the page */
+  #estage > #eprops { position: absolute; z-index: 60; margin: 0; padding: 6px 10px; line-height: normal; width: max-content;
+    max-width: min(640px, calc(100% - 8px)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
+    box-shadow: 0 6px 22px rgba(0,0,0,.24); border-radius: 8px; cursor: default; }
+  #estage > #eprops[hidden] { display: none; }
+  #estage > #eprops .prophead { margin: 0; gap: 10px; }
+  #estage > #eprops .proprow { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+  #estage > #eprops textarea { width: 230px; height: 56px; min-height: 0; padding: 5px 7px; font-size: 13px; }
+  #estage > #eprops select { width: auto; max-width: 180px; padding: 4px 6px; font-size: 13px; }
+  #estage > #eprops input[type=range] { width: 90px; }
+  #estage > #eprops .warnline { flex: 1 1 100%; margin: 0; }
   /* Word-style tool buttons: icon over a label */
   #annot-tools { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; }
   #annot-tools .tool { flex-direction: column; justify-content: center; gap: 3px; width: 56px; height: 50px; padding: 4px 2px 3px;
@@ -724,7 +735,7 @@
           <div class="workarea" id="workarea">
             <div class="stagecol">
               <div class="stage-wrap">
-              <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div></div>
+              <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div><div class="props" id="eprops" hidden></div></div>
             </div>
             </div>
             <div class="ctlcol">
@@ -793,7 +804,6 @@
           </div>
         </div>
           </div>
-<div class="props" id="eprops" hidden></div>
 <div class="props" id="fpanel" hidden>
             <div class="prophead"><b id="f-label"></b><span class="muted" id="f-pos"></span></div>
             <div id="f-input"></div>
@@ -2800,6 +2810,7 @@ else if (typeof exports === 'object')
         clampObj(o);
         if (resizing && o.type === "text") { drawLayer(); return; }
         Object.assign(target.style, { left: o.x * s + "px", top: o.y * s + "px", width: o.w * s + "px", height: o.h * s + "px" });
+        positionProps();
       };
       const up = () => {
         window.removeEventListener("pointermove", move);
@@ -2968,7 +2979,32 @@ else if (typeof exports === 'object')
     return row;
   }
 
-  function renderProps(){
+  // The selected object's controls ride next to the object, above it or below it when there is
+  // no room, so nothing is added to the ribbon and the page does not move when you select
+  // something. On a phone, where a bar over the page would cover it, they stay in the panel.
+  const narrowScreen = () => !!(window.matchMedia && window.matchMedia("(max-width: 760px)").matches);
+  function placeProps(){
+    const box = $("eprops"), want = narrowScreen() ? document.querySelector(".ctlcol") : eStage;
+    if (box.parentElement === want) return;
+    if (want === eStage) eStage.appendChild(box);
+    else want.insertBefore(box, $("fpanel"));
+    box.style.left = box.style.top = "";
+  }
+  function positionProps(){
+    const box = $("eprops");
+    if (box.hidden || box.parentElement !== eStage) return;
+    const el = eLayer.querySelector(".eobj.sel");
+    if (!el) return;
+    const gap = 10, w = box.offsetWidth, h = box.offsetHeight, sw = eStage.clientWidth;
+    let top = el.offsetTop - h - gap;
+    if (top < 4) top = el.offsetTop + el.offsetHeight + gap;      // no room above: sit below
+    const left = Math.max(4, Math.min(el.offsetLeft, sw - w - 4));
+    box.style.left = left + "px"; box.style.top = Math.max(4, top) + "px";
+  }
+  ["pointerdown", "click", "dblclick"].forEach(t => $("eprops").addEventListener(t, e => e.stopPropagation()));
+  window.matchMedia && window.matchMedia("(max-width: 760px)").addEventListener("change", () => { placeProps(); positionProps(); });
+  function renderProps(){ placeProps(); renderPropsInner(); positionProps(); }
+  function renderPropsInner(){
     const box = $("eprops");
     const o = ed.objs.find(x => x.id === ed.sel);
     const active = document.activeElement && document.activeElement.id;
@@ -3148,7 +3184,7 @@ else if (typeof exports === 'object')
     // Text editing happens on the page and in the ribbon, so the side panel only opens for
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
-    const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" ||
+    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) || ed.mode === "form" ||
                        textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
     // contextual panels float over the page edge instead of taking a column, so the page
     // keeps its width whether or not one is showing
