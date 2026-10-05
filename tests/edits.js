@@ -23,7 +23,7 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
  // page 2 is rotated 90: add red text there
  await p.click('#e-next'); await sleep(800);
  await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await stageClick(p,0.2,0.3);
- check('edit: text box created and focused', await p.evaluate(()=>document.activeElement && document.activeElement.id==='ep-text'));
+ check('edit: a new text box takes the typing at once, on the page', await p.evaluate(()=>document.activeElement && document.activeElement.classList.contains('tedit')));
  await p.keyboard.type('Hello there'); await sleep(150);
  await p.click('#eprops .colorchip[title=Red]'); await sleep(150);
  const tbox=await objFrac(p,'.eobj.t-text');
@@ -300,7 +300,7 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    check('align: a text box has alignment buttons', (await ap.$$('#eprops .alignbtn')).length===3);
    for (const which of ['right','center']) {
      await ap.evaluate(w=>document.querySelector('#eprops .alignbtn[data-align='+w+']').click(), which); await sleep(400);
-     const tl=await ap.$$eval('.eobj.sel .tl',es=>es.map(e=>getComputedStyle(e).textAlign)); check(`align: the box previews ${which}`, tl.length===2 && tl.every(t=>t===which), tl.join());
+     const tl=await ap.$$eval('.eobj.sel .tl, .eobj.sel .tedit',es=>es.map(e=>getComputedStyle(e).textAlign)); check(`align: the box previews ${which}`, tl.length>=1 && tl.every(t=>t===which), tl.join());
      await H.applyAndDownload(ap,'#edit-go'); const bd=await H.takeDownloads(ap,1); const f=`align-box-${which}.pdf`; fs.writeFileSync(f,bd[0].buf);
      const ex=lineExtents(f).filter(r=>/Hi|longer/.test(r.t));
      const ok=ex.length===2 && (which==='right' ? Math.abs(ex[0].x1-ex[1].x1)<1.6 && ex[0].x0>ex[1].x0+5 : Math.abs((ex[0].x0+ex[0].x1)/2-(ex[1].x0+ex[1].x1)/2)<1.6 && ex[0].x0>ex[1].x0+5);
@@ -980,34 +980,74 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      await p.keyboard.down('Control'); await p.keyboard.press('s'); await p.keyboard.up('Control');
      const dls=await H.takeDownloads(p,1).catch(()=>[]);
      check('header: Ctrl+S downloads the document', dls.length===1 && dls[0].buf.slice(0,5).toString()==='%PDF-', dls.length+' download(s)'); }
-   // the selected object's controls ride next to the object, not in the ribbon or a side column
+   // the selected item's controls are in the ribbon, in the place of the tools: no popout, no height change
    { await p.evaluate(()=>window.scrollTo(0,0)); await sleep(150);
      const rb0=await p.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height)), pg0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().top));
      await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=box]').click());
      const sb=await (await p.$('#estage')).boundingBox(); await p.mouse.click(sb.x+sb.width*0.5, sb.y+sb.height*0.6); await sleep(600);
-     const g=await p.evaluate(()=>{const bar=document.getElementById('eprops'), o=document.querySelector('.eobj.sel'), br=bar.getBoundingClientRect(), or=o.getBoundingClientRect();
-       return {parent:bar.parentElement.id, hidden:bar.hidden, near:Math.min(Math.abs(br.bottom-or.top), Math.abs(br.top-or.bottom))<=24, overlapsObj:!(br.bottom<=or.top||br.top>=or.bottom||br.right<=or.left||br.left>=or.right),
-         sidePanel:document.getElementById('workarea').classList.contains('has-props'), ribbon:Math.round(document.getElementById('docribbon').getBoundingClientRect().height), pageTop:Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().top), n:document.querySelectorAll('.eobj').length};});
-     check('props: the controls sit next to the selected object, not over it', g.parent==='estage' && !g.hidden && g.near && !g.overlapsObj, JSON.stringify(g));
-     check('props: selecting an object adds nothing to the ribbon and moves nothing', !g.sidePanel && g.ribbon===rb0 && g.pageTop===pg0, JSON.stringify({rb0,pg0,...g}));
-     // pressing inside the bar must not fall through to the page and deselect the object
+     const g=await p.evaluate(()=>{const bar=document.getElementById('eprops'); return {parent:bar.parentElement.id, hidden:bar.hidden, inStage:!!document.querySelector('#estage #eprops'), tools:getComputedStyle(document.getElementById('annot-tools')).display,
+         sidePanel:document.getElementById('workarea').classList.contains('has-props'), ribbon:Math.round(document.getElementById('docribbon').getBoundingClientRect().height), pageTop:Math.round(document.querySelector('.stage-wrap').getBoundingClientRect().top), n:document.querySelectorAll('.eobj').length,
+         hasDelete:[...bar.querySelectorAll('button')].some(b=>/delete/i.test(b.textContent+b.getAttribute('aria-label')))};});
+     check('props: the controls are in the ribbon in place of the tools, with no popout over the page', g.parent==='rp-annotate' && !g.hidden && !g.inStage && g.tools==='none', JSON.stringify(g));
+     check('props: selecting an item adds nothing to the ribbon and moves nothing', !g.sidePanel && g.ribbon===rb0 && g.pageTop===pg0, JSON.stringify({rb0,pg0,...g}));
+     check('props: there is no Delete button in the controls (the X on the item does that)', !g.hasDelete, JSON.stringify(g));
      const cr=await (await p.$('#eprops .colorchip[title=Red]')).boundingBox(); await p.mouse.click(cr.x+cr.width/2, cr.y+cr.height/2); await sleep(400);
      const after=await p.evaluate(()=>({n:document.querySelectorAll('.eobj').length, sel:!!document.querySelector('.eobj.sel'), hidden:document.getElementById('eprops').hidden}));
-     check('props: clicking inside the bar keeps the selection', after.n===g.n && after.sel && !after.hidden, JSON.stringify(after));
-     // the X finishes with the item: the bar goes, the item stays and is still counted
-     await p.click('#eprops .propclose'); await sleep(400);
-     { const d=await p.evaluate(()=>({bar:document.getElementById('eprops').hidden, sel:!!document.querySelector('.eobj.sel'), n:document.querySelectorAll('.eobj').length, summary:document.getElementById('edit-summary').textContent}));
-       check('props: the X closes the controls and leaves the item on the page', d.bar && !d.sel && d.n===g.n && /1 item/.test(d.summary), JSON.stringify(d)); }
+     check('props: changing the colour keeps the item selected', after.n===g.n && after.sel && !after.hidden, JSON.stringify(after));
+     // Done finishes with the item: the controls go, the tools come back, the item stays and is still counted
+     await p.click('#eprops .propdone'); await sleep(400);
+     { const d=await p.evaluate(()=>({bar:document.getElementById('eprops').hidden, tools:getComputedStyle(document.getElementById('annot-tools')).display, sel:!!document.querySelector('.eobj.sel'), n:document.querySelectorAll('.eobj').length, summary:document.getElementById('edit-summary').textContent}));
+       check('props: Done brings the tools back and leaves the item on the page', d.bar && d.tools!=='none' && !d.sel && d.n===g.n && /1 item/.test(d.summary), JSON.stringify(d)); }
      await p.evaluate(()=>document.querySelector('.eobj').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0})));
      await p.evaluate(()=>window.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}))); await sleep(500);
      check('props: selecting the item again brings the controls back', !(await p.$eval('#eprops',e=>e.hidden)));
-     await p.evaluate(()=>document.querySelector('#eprops .prophead .btn').click()); await sleep(300);
-     check('props: Delete in the bar removes the object and the bar goes away', (await p.$$('.eobj')).length===g.n-1 && await p.$eval('#eprops',e=>e.hidden)); }
+     await p.click('.eobj.sel .ex'); await sleep(400);
+     check('props: the X on the item deletes it and the controls go away', (await p.$$('.eobj')).length===g.n-1 && await p.$eval('#eprops',e=>e.hidden)); }
+   // ---- typing on the page ----
+   { const tp=(await H.newPage(b,H.LOCAL,false)).p; await tp.setViewport({width:1280,height:900});
+     await upload(tp,'#edit-input',FX('a.pdf')); await tp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+     const sbb=await (await tp.$('#estage')).boundingBox();
+     const h0=await tp.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height)), t0=await tp.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().top));
+     await tp.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await tp.mouse.click(sbb.x+sbb.width*0.2, sbb.y+sbb.height*0.25); await sleep(500);
+     const ed0=await tp.evaluate(()=>({ce:document.activeElement.classList.contains('tedit'), kind:document.activeElement.contentEditable, textarea:!!document.querySelector('textarea#ep-text')}));
+     check('typing: a new text box is typed in on the page itself (no text field in the controls)', ed0.ce && !ed0.textarea, JSON.stringify(ed0));
+     await tp.keyboard.type('On the page'); await tp.keyboard.press('Enter'); await tp.keyboard.type('second line'); await sleep(300);
+     const live=await tp.evaluate(()=>({txt:document.querySelector('.tedit').textContent, w:Math.round(document.querySelector('.eobj.sel').getBoundingClientRect().width), h:Math.round(document.querySelector('.eobj.sel').getBoundingClientRect().height)}));
+     check('typing: what is typed shows in the box, newline included, and the box grows to fit', live.txt==='On the page\nsecond line' && live.h>25, JSON.stringify(live));
+     check('typing: the ribbon and page do not move while typing', (await tp.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height)))===h0 && (await tp.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().top)))===t0);
+     await tp.keyboard.press('Backspace'); await tp.keyboard.press('Backspace'); await sleep(200);
+     check('typing: Backspace edits the text and does not delete the box', (await tp.$$('.eobj')).length===1 && (await tp.$eval('.tedit',e=>e.textContent))==='On the page\nsecond li');
+     await tp.keyboard.press('Escape'); await sleep(400);
+     { const d=await tp.evaluate(()=>({n:document.querySelectorAll('.eobj').length, ed:!!document.querySelector('.tedit'), sel:!!document.querySelector('.eobj.sel'), lines:[...document.querySelectorAll('.eobj .tl')].map(e=>e.textContent), tools:getComputedStyle(document.getElementById('annot-tools')).display}));
+       check('typing: Escape finishes: the text stays on the page as drawn lines and the tools return', d.n===1 && !d.ed && !d.sel && d.lines.join('|')==='On the page|second li' && d.tools!=='none', JSON.stringify(d)); }
+     // back into it: a quick second press on the selected box, then Enter
+     { const bb=await (await tp.$('.eobj')).boundingBox(); const cx=bb.x+bb.width/2, cy=bb.y+bb.height/2;
+       await tp.mouse.click(cx,cy); await tp.mouse.click(cx,cy); await sleep(700); }
+     check('typing: a second press on the box starts typing in it again', await tp.evaluate(()=>!!document.querySelector('.tedit') && document.activeElement.classList.contains('tedit')));
+     await tp.keyboard.type('ne'); await sleep(200);
+     check('typing: the caret goes to the end, so typing continues the text', (await tp.$eval('.tedit',e=>e.textContent))==='On the page\nsecond line');
+     await tp.keyboard.press('Escape'); await sleep(300);
+     { const bb=await (await tp.$('.eobj')).boundingBox(); await tp.mouse.click(bb.x+bb.width/2, bb.y+bb.height/2); await sleep(500); }
+     await tp.evaluate(()=>document.activeElement&&document.activeElement.blur()); await tp.keyboard.press('Enter'); await sleep(500);
+     check('typing: Enter on a selected text box starts typing too', await tp.evaluate(()=>!!document.querySelector('.tedit')));
+     await tp.keyboard.press('Escape'); await sleep(300);
+     await H.applyAndDownload(tp,'#edit-go'); const td=await H.takeDownloads(tp,1); fs.writeFileSync('typed-on-page.pdf',td[0].buf);
+     { const t=execSync('pdftotext -f 1 -l 1 typed-on-page.pdf -').toString().replace(/\s+/g,' ');
+       check('typing: the text typed on the page is in the saved file', t.includes('On the page second line'), t.slice(0,100)); }
+     await tp.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(1500);
+     // an empty text box that is left behind is not kept
+     await tp.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await tp.mouse.click(sbb.x+sbb.width*0.5, sbb.y+sbb.height*0.5); await sleep(400);
+     const n1=await tp.$$eval('.eobj',e=>e.length);
+     await tp.mouse.click(sbb.x+sbb.width*0.8, sbb.y+sbb.height*0.8); await sleep(400);
+     check('typing: an empty text box is dropped when you click away from it', n1===1 && (await tp.$$('.eobj')).length===0 && /No changes|0 item|^$/.test(await tp.$eval('#edit-summary',e=>e.textContent)) , n1+' then '+(await tp.$$('.eobj')).length+' / '+await tp.$eval('#edit-summary',e=>e.textContent));
+     await tp.close(); }
    { const mp=(await H.newPage(b,H.LOCAL,true)); await upload(mp.p,'#edit-input',FX('a.pdf')); await mp.p.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
+     const collapsed0=await mp.p.$eval('#docribbon',e=>e.classList.contains('collapsed'));
+     await mp.p.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=annotate]').click()); await sleep(300);
      await mp.p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=box]').click());
-     const mb=await (await mp.p.$('#estage')).boundingBox(); await mp.p.mouse.click(mb.x+mb.width*0.5, mb.y+mb.height*0.4); await sleep(600);
-     const m=await mp.p.evaluate(()=>({parent:document.getElementById('eprops').parentElement.className, hidden:document.getElementById('eprops').hidden}));
-     check('props: on a phone the controls stay in the panel instead of covering the page', m.parent==='ctlcol' && !m.hidden, JSON.stringify(m));
+     const mb=await (await mp.p.$('#estage')).boundingBox(); await mp.p.mouse.click(mb.x+mb.width*0.5, mb.y+mb.height*0.4); await sleep(700);
+     const m=await mp.p.evaluate(()=>({parent:document.getElementById('eprops').parentElement.id, hidden:document.getElementById('eprops').hidden, collapsed:document.getElementById('docribbon').classList.contains('collapsed')}));
+     check('props: on a phone the ribbon opens when an item is selected, and the controls are in it', collapsed0 && m.parent==='rp-annotate' && !m.hidden && !m.collapsed, JSON.stringify({collapsed0,...m}));
      await mp.p.close(); }
    // ---- jump to a page by typing its number ----
    { const lp=H.path.resolve(__dirname,'fx','long.pdf');

@@ -298,23 +298,21 @@
   .fhit { position: absolute; background: rgba(255, 213, 0, .45); mix-blend-mode: multiply; border-radius: 2px; pointer-events: none; }
   .fhit.cur { background: rgba(255, 140, 0, .6); outline: 2px solid #E07B00; }
   @media (max-width: 760px) { .findbar { left: 8px; right: 8px; top: 6px; } .findbar input[type=search] { flex: 1; width: auto; min-width: 0; } }
-  /* the selected object's controls: a small bar attached to the object, over the page */
-  #estage > #eprops { position: absolute; z-index: 60; margin: 0; padding: 6px 10px; line-height: normal; width: max-content;
-    max-width: min(640px, calc(100% - 8px)); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px;
-    box-shadow: 0 6px 22px rgba(0,0,0,.24); border-radius: 8px; cursor: default; }
-  #estage > #eprops[hidden] { display: none; }
-  #estage > #eprops .prophead { margin: 0; gap: 10px; }
-  #estage > #eprops { padding-right: 38px; }
-  .propclose { position: absolute; top: 5px; right: 6px; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
-    border: none; border-radius: 4px; background: none; color: var(--ink-soft); font-size: 14px; line-height: 1; cursor: pointer; }
-  .propclose:hover { background: var(--canvas); color: var(--ink); }
-  .propclose:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
-  .ctlcol .propclose { display: none; }          /* on a phone the panel already has its own close button */
-  #estage > #eprops .proprow { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
-  #estage > #eprops textarea { width: 230px; height: 56px; min-height: 0; padding: 5px 7px; font-size: 13px; }
-  #estage > #eprops select { width: auto; max-width: 180px; padding: 4px 6px; font-size: 13px; }
-  #estage > #eprops input[type=range] { width: 90px; }
-  #estage > #eprops .warnline { flex: 1 1 100%; margin: 0; }
+  /* the selected item's controls: they take the place of the tool buttons in the Add-to-page row,
+     so the ribbon is the same height and the page does not move when something is selected */
+  #rp-annotate.has-obj #annot-tools, #rp-annotate.has-obj #edit-hint { display: none; }
+  .objfmt { flex: 1 1 auto; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0; padding: 0; line-height: normal; }
+  .objfmt[hidden] { display: none; }
+  .objfmt .objname { font-weight: 600; margin-right: 2px; }
+  .objfmt .proprow { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
+  .objfmt select { width: 132px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .objfmt input[type=number] { width: 60px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .objfmt .warnline { margin: 0; font-size: 12.5px; flex: 1 1 100%; }
+  .objfmt .propdone { margin-left: auto; }
+  /* typing on the page: the text box itself is the editor */
+  .eobj .tedit { outline: none; cursor: text; min-width: 1ch; white-space: pre; caret-color: var(--gold-dim); }
+  .eobj .tedit.wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .eobj .tedit:empty::before { content: attr(data-ph); color: rgba(0,0,0,.4); }
   /* Word-style tool buttons: icon over a label */
   #annot-tools { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; }
   #annot-tools .tool { flex-direction: column; justify-content: center; gap: 3px; width: 56px; height: 50px; padding: 4px 2px 3px;
