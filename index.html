@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-3z+3JppwMFTx1HF70kRUbTdjQi/ZRwzFaSk+UvKfBN8=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-2eSk5xytiMtsBm7hi3ab0NrRT1MQupffMCYDGgB5zO0=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -314,6 +314,12 @@
     box-shadow: 0 6px 22px rgba(0,0,0,.24); border-radius: 8px; cursor: default; }
   #estage > #eprops[hidden] { display: none; }
   #estage > #eprops .prophead { margin: 0; gap: 10px; }
+  #estage > #eprops { padding-right: 38px; }
+  .propclose { position: absolute; top: 5px; right: 6px; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    border: none; border-radius: 4px; background: none; color: var(--ink-soft); font-size: 14px; line-height: 1; cursor: pointer; }
+  .propclose:hover { background: var(--canvas); color: var(--ink); }
+  .propclose:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .ctlcol .propclose { display: none; }          /* on a phone the panel already has its own close button */
   #estage > #eprops .proprow { display: inline-flex; align-items: center; gap: 6px; margin: 0; }
   #estage > #eprops textarea { width: 230px; height: 56px; min-height: 0; padding: 5px 7px; font-size: 13px; }
   #estage > #eprops select { width: auto; max-width: 180px; padding: 4px 6px; font-size: 13px; }
@@ -3073,11 +3079,18 @@ else if (typeof exports === 'object')
     const del = document.createElement("button"); del.className = "btn"; del.textContent = "Delete"; del.addEventListener("click", () => deleteObj(o.id));
     head.append(t, del);
     box.appendChild(head);
+    // done with this item: the bar goes away and the item stays on the page
+    const done = document.createElement("button");
+    done.type = "button"; done.className = "propclose"; done.textContent = "\u2715";
+    done.setAttribute("aria-label", "Close these controls"); done.title = "Done (Esc)";
+    done.addEventListener("click", () => { ed.sel = null; drawLayer(); editUi(); });
+    box.appendChild(done);
     if (o.type === "text") {
       const ta = document.createElement("textarea");
       ta.id = "ep-text"; ta.rows = 3; ta.value = o.raw; ta.placeholder = "Type here"; ta.setAttribute("aria-label", "Text");
       const warn = document.createElement("div"); warn.className = "warnline"; warn.hidden = true;
       warn.textContent = "Some characters can't be used in PDF text and were replaced with ?.";
+      ta.addEventListener("keydown", ev => { if (ev.key === "Escape") { ev.preventDefault(); ed.sel = null; drawLayer(); editUi(); } });
       ta.addEventListener("input", () => {
         o.raw = ta.value;
         const c = cleanText(ta.value);

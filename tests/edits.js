@@ -994,6 +994,13 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      const cr=await (await p.$('#eprops .colorchip[title=Red]')).boundingBox(); await p.mouse.click(cr.x+cr.width/2, cr.y+cr.height/2); await sleep(400);
      const after=await p.evaluate(()=>({n:document.querySelectorAll('.eobj').length, sel:!!document.querySelector('.eobj.sel'), hidden:document.getElementById('eprops').hidden}));
      check('props: clicking inside the bar keeps the selection', after.n===g.n && after.sel && !after.hidden, JSON.stringify(after));
+     // the X finishes with the item: the bar goes, the item stays and is still counted
+     await p.click('#eprops .propclose'); await sleep(400);
+     { const d=await p.evaluate(()=>({bar:document.getElementById('eprops').hidden, sel:!!document.querySelector('.eobj.sel'), n:document.querySelectorAll('.eobj').length, summary:document.getElementById('edit-summary').textContent}));
+       check('props: the X closes the controls and leaves the item on the page', d.bar && !d.sel && d.n===g.n && /1 item/.test(d.summary), JSON.stringify(d)); }
+     await p.evaluate(()=>document.querySelector('.eobj').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0})));
+     await p.evaluate(()=>window.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}))); await sleep(500);
+     check('props: selecting the item again brings the controls back', !(await p.$eval('#eprops',e=>e.hidden)));
      await p.evaluate(()=>document.querySelector('#eprops .prophead .btn').click()); await sleep(300);
      check('props: Delete in the bar removes the object and the bar goes away', (await p.$$('.eobj')).length===g.n-1 && await p.$eval('#eprops',e=>e.hidden)); }
    { const mp=(await H.newPage(b,H.LOCAL,true)); await upload(mp.p,'#edit-input',FX('a.pdf')); await mp.p.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1200);
