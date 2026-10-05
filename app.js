@@ -4882,7 +4882,7 @@
         { name: "subjectKeyIdentifier" }
       ]);
       cert.sign(keys.privateKey, forge.md.sha256.create());
-      const p12 = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [cert], $("dg-pw").value, { algorithm: "aes256", friendlyName: $("dg-name").value.trim(), generateLocalKeyId: true });
+      const p12 = forge.pkcs12.toPkcs12Asn1(keys.privateKey, [cert], $("dg-pw").value, { algorithm: "aes256", count: 100000, friendlyName: $("dg-name").value.trim(), generateLocalKeyId: true });
       const pfx = binToBytes(forge.asn1.toDer(p12).getBytes());
       const certDer = binToBytes(forge.asn1.toDer(forge.pki.certificateToAsn1(cert)).getBytes());
       const base = $("dg-name").value.trim().replace(/[^\w.-]+/g, "_").slice(0, 40) || "digital-id";
@@ -5046,6 +5046,29 @@
 
   // ---------- C. Verify ----------
   const DIGESTS = { [OIDS.sha1]: ["sha1", "SHA-1"], [OIDS.sha256]: ["sha256", "SHA-256"], [OIDS.sha384]: ["sha384", "SHA-384"], [OIDS.sha512]: ["sha512", "SHA-512"] };
+  // RSA PKCS#1 v1.5 check done here instead of in node-forge: forge <= 1.4.0 tolerates extra bytes
+  // inside the DigestInfo (GHSA-86w9-cpqp-85rv), which lets a low-exponent key's signature be
+  // forged. This rebuilds the one exact encoding that is allowed and compares every byte.
+  const DIGESTINFO_PREFIX = {
+    sha1: "3021300906052b0e03021a05000414", sha256: "3031300d060960864801650304020105000420",
+    sha384: "3041300d060960864801650304020205000430", sha512: "3051300d060960864801650304020305000440"
+  };
+  function strictRsaVerify(pub, digestBin, sigBin, hashName){
+    const BI = forge.jsbn.BigInteger, prefix = DIGESTINFO_PREFIX[hashName];
+    if (!prefix || !pub || !pub.n || !pub.e) return false;
+    if (pub.e.compareTo(new BI("65537")) < 0) return false;               // low exponents are what the forgery needs
+    const k = Math.ceil(pub.n.bitLength() / 8);
+    if (k < 128 || sigBin.length > k) return false;                       // 1024-bit keys and up
+    const hex = forge.util.bytesToHex(sigBin);
+    const sig = new BI(hex || "0", 16);
+    if (sig.compareTo(pub.n) >= 0) return false;
+    let em = sig.modPow(pub.e, pub.n).toString(16);
+    em = em.padStart(k * 2, "0");
+    const dh = forge.util.bytesToHex(digestBin);
+    const padLen = k - 3 - (prefix.length + dh.length) / 2;
+    if (padLen < 8) return false;
+    return em === "0001" + "ff".repeat(padLen) + "00" + prefix + dh;
+  }
   function asn1Find(node, pred){ if (pred(node)) return node; if (Array.isArray(node.value)) for (const c of node.value) { const r = asn1Find(c, pred); if (r) return r; } return null; }
 
   function verifyOne(fileBytes, br, contents){
@@ -5100,7 +5123,7 @@
       const m = forge.md[dg0[0]].create(); m.update(forge.asn1.toDer(set).getBytes()); toVerify = m.digest().getBytes();
     } else { toVerify = docDigest; r.integrity = "match"; }
     let sigOk = false;
-    try { sigOk = cert.publicKey.verify(toVerify, sigBytes); } catch (e) { sigOk = false; }
+    try { sigOk = strictRsaVerify(cert.publicKey, toVerify, sigBytes, dg0[0]); } catch (e) { sigOk = false; }
     r.sigOk = sigOk;
     if (!auth && !sigOk) r.integrity = "mismatch";
     r.ok = sigOk && r.integrity === "match";
@@ -5412,7 +5435,7 @@
         const im = imageInfo(doc, obj);
         const supported = im.w && im.h && im.bpc === 8 && !im.imageMask && !im.colorKey && !im.decode && im.comps &&
           (im.filter === "/DCTDecode" || ((im.filter === "/FlateDecode" || im.filter === "none") && im.predictor === 1));
-        if (!supported || im.size < 20000) { skipped++; continue; }
+        if (!supported || im.size < 20000 || im.w * im.h > 100e6) { skipped++; continue; }     // a declared size in the hundreds of megapixels would only exhaust memory
         let src;
         try { src = await toBitmapSource(obj, im); } catch (e) { skipped++; continue; }
         const s = Math.min(1, maxPx / Math.max(im.w, im.h));
