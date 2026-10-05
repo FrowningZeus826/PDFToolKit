@@ -273,13 +273,22 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
  { await pickBlock(1); await sleep(200);
    await p.keyboard.press('Enter'); await sleep(600);
    check('wrapping: Enter puts the caret in the text', (await p.$$eval('.tprev',els=>els.filter(e=>e.isContentEditable).length))>0);
-   const lines0=(await p.$eval('#tx-text',e=>e.value)).split('\n').length;
-   await p.keyboard.type(' and then a good deal more text typed into this line so that it has to wrap onto another'); await sleep(1300);
+   const orig0=await p.$eval('#tx-text',e=>e.value); const lines0=orig0.split('\n').length;
+   const added=' and then a good deal more text typed into this line so that it has to wrap onto another';
+   await p.keyboard.press('End');
+   await p.keyboard.type(added); await sleep(1300);
    const lines1=(await p.$eval('#tx-text',e=>e.value)).split('\n').length;
    check('wrapping: the paragraph gains lines rather than running off the edge', lines1>lines0, `${lines0} lines, then ${lines1}`);
    const over=await p.evaluate(()=>{const blk=document.querySelectorAll('.trun.block')[1].getBoundingClientRect();
      return Math.max(...[...document.querySelectorAll('.tprev')].map(e=>e.getBoundingClientRect().width)) - blk.width;});
    check('wrapping: no line is wider than the block it sits in', over<=2, Math.round(over)+'px over');
+   for(let k=0;k<added.length;k++) await p.keyboard.press('Backspace'); await sleep(1300);
+   { const back=await p.$eval('#tx-text',e=>e.value);
+     const flat=t=>t.replace(/\s+/g,' ').trim();
+     check('wrapping: deleting the added text unwraps it back to the original text and line count', flat(back)===flat(orig0) && back.split('\n').length===lines0, back.split('\n').length+' lines vs '+lines0+'; '+JSON.stringify(back.slice(0,90))); }
+   await p.keyboard.type(' ab cd'); await sleep(900);
+   { const t2=await p.$eval('#tx-text',e=>e.value); const f2=t2.replace(/\s+/g,' ');
+     check('wrapping: typed spaces survive, so words are not glued together', /(^| )ab cd /.test(f2) && !/[a-z,]October/.test(f2), JSON.stringify(f2.slice(55,110))); }
    await p.keyboard.press('Escape'); await sleep(300);
    check('wrapping: Escape leaves the text', (await p.$$eval('.tprev',els=>els.filter(e=>e.isContentEditable).length))===0);
    await p.evaluate(()=>document.getElementById('docbar-undo').click()).catch(()=>{}); await sleep(800); }
@@ -482,6 +491,11 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    check('redact: dragging marks an area and counts what it will remove',
      /1 area on this page/.test(await txt(p,'#rd-count')) && /lines? of text will be deleted/.test(await txt(p,'#rd-count')), await txt(p,'#rd-count'));
    check('redact: the marked area is shown on the page', (await p.$$('.redbox')).length===1);
+   { const ids=await p.evaluate(()=>[...document.querySelectorAll('#rd-ribbon button, #rd-ribbon select')].map(e=>e.id));
+     check('redact: the controls sit in a ribbon above the page', ['rd-mark','rd-clear'].every(id=>ids.includes(id)) && !(await p.$eval('#rd-ribbon',e=>e.hidden)), ids.join(','));
+     const geo=await p.evaluate(()=>{const r=document.getElementById('rd-ribbon').getBoundingClientRect(), st=document.getElementById('estage').getBoundingClientRect(); return {above:r.bottom<=st.top+1, wa:document.getElementById('workarea').classList.contains('has-props')};});
+     check('redact: the ribbon is above the page and no side panel opens', geo.above && !geo.wa, JSON.stringify(geo));
+     check('redact: the text ribbon is not shown at the same time', await p.$eval('#tx-ribbon',e=>e.hidden)); }
    check('redact: how the area is finished can be chosen', (await p.$$eval('#rd-mark option',os=>os.map(o=>o.value))).join(',')==='black,white,none');
    await H.applyAndDownload(p,'#edit-go'); d=await H.takeDownloads(p,1); fs.writeFileSync('redacted.pdf',d[0].buf);
    execSync('pdftotext fx/quote.pdf /tmp/red-b.txt 2>/dev/null; pdftotext redacted.pdf /tmp/red-a.txt 2>/dev/null');

@@ -13,6 +13,19 @@ node fixtures/fixtures2.js
 echo "==> scans for OCR (English + Spanish) and a photo-heavy PDF for the compressor"
 node fixtures/mkscan.js
 node fixtures/mkspa.js
+echo "==> source images for the photo-heavy PDF"
+python3 - <<'PY'
+import random
+from PIL import Image, ImageFilter
+random.seed(7)
+# noisy, photo-like content so the JPEG is large enough for the compressor to shrink
+im=Image.effect_noise((2200,1650),90).convert('RGB').filter(ImageFilter.GaussianBlur(1))
+im.save('fx/photo-src.jpg', quality=90)
+al=Image.new('RGBA',(600,600),(0,0,0,0))
+from PIL import ImageDraw
+d=ImageDraw.Draw(al); d.ellipse([40,40,560,560],fill=(200,40,40,200)); d.ellipse([200,200,400,400],fill=(20,60,160,90))
+al.save('fx/alpha-src.png')
+PY
 node fixtures/mkphoto.js
 
 echo "==> photos, for adding images as pages in Merge"
@@ -24,6 +37,18 @@ for name,(w,h),color in [('form-photo.jpg',(1200,1600),(250,248,240)),('wide-pho
     d.rectangle([int(w*0.2),int(h*0.35),int(w*0.8),int(h*0.5)],fill=(20,60,160))
     im.save('fx/'+name, quality=88)
 PY
+
+echo "==> realistic documents (letterhead quote, letter, scaled, Type 3, browser-printed, split runs...)"
+python3 - <<'PY'
+from PIL import Image, ImageDraw
+im=Image.new('RGB',(380,126),(30,60,120)); d=ImageDraw.Draw(im)
+d.rectangle([8,8,372,118],outline=(240,240,240),width=4); d.text((150,55),'LOGO',fill=(255,255,255))
+im.save('fx/logo.png')
+PY
+python3 fixtures/mkrealistic.py
+
+echo "==> oversized file (sparse, 260 MB, valid header) for the size-limit check"
+printf '%%PDF-1.4\n' > fx/huge.pdf && truncate -s 260M fx/huge.pdf
 
 echo "==> encrypted PDFs: every revision of the standard security handler"
 qpdf --encrypt user owner 256 -- fx/b.pdf fx/encrypted.pdf

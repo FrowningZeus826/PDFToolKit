@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-AsBNWgIvhj/idZtm5hRXy8FegZpiy+q6il3rHnRkRag=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-46FUplMe0mTGLnvL9jwfYM5iKGzAy7C0SqnMwKkYky0=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -327,16 +327,22 @@
   .selftest li.bad { color: var(--bad); font-weight: 600; }
   .selftest .ok { color: var(--good); }
   .selftest .bad { color: var(--bad); }
-  /* the editing ribbon: fixed above the page, like a word processor's */
-  .ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 8px;
+  /* the editing ribbons: fixed above the page, like a word processor's. Controls sit in
+     small labelled groups so a long row reads as a few things, not a dozen. */
+  .ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 12px; margin-bottom: 8px;
     background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+  .ribbon[hidden] { display: none; }
   .ribbon .btn { padding: 5px 10px; font-size: 13px; }
+  .ribbon-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ribbon-title { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
+  .ribbon-status { color: var(--ink); font-weight: 500; }
   .ribbon-sep { width: 1px; height: 22px; background: var(--line); }
   .ribbon-field { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); }
-  .ribbon-field select { max-width: 190px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .ribbon-field select { min-width: 120px; max-width: 190px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
   .ribbon-field input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
-  .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; }
+  .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; line-height: 1.4; }
   .ribbon-note.warn { color: var(--bad); }
+  @media (max-width: 640px) { .ribbon-sep { display: none; } .ribbon { gap: 8px 10px; } }
   .groupctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
   .groupctl input[type=range] { width: 92px; }
   .groupctl span { min-width: 54px; }
@@ -619,18 +625,44 @@
           </div>
           <div class="stagecol">
           <div class="ribbon" id="tx-ribbon" hidden>
-<div class="pagesbar">
-                  <label class="groupctl" for="tx-group">Grouping
-                    <input type="range" id="tx-group" min="0" max="3" step="1" value="1" aria-label="How willingly text is grouped into paragraphs">
-                    <span id="tx-group-name" class="muted">Normal</span></label>
-                  <button class="btn" id="tx-showall" aria-pressed="false" title="Outline every editable block, instead of only the one under the pointer">Show all blocks</button>
-                  <button class="btn" id="tx-merge" title="Join this block with another one you pick">Merge with…</button>
-                  <button class="btn" id="tx-split" title="Split this block where you click on the page">Split…</button>
-                </div>
+            <div class="ribbon-group" role="group" aria-label="Grouping">
+              <span class="ribbon-title">Grouping</span>
+              <label class="groupctl" for="tx-group">
+                <input type="range" id="tx-group" min="0" max="3" step="1" value="1" aria-label="How willingly text is grouped into paragraphs">
+                <span id="tx-group-name" class="muted">Normal</span></label>
+              <button class="btn" id="tx-showall" aria-pressed="false" title="Outline every editable block, instead of only the one under the pointer">Show all blocks</button>
+            </div>
             <span class="ribbon-sep"></span>
-            <label class="ribbon-field" for="rb-font">Font <select id="rb-font" aria-label="Font"></select></label>
-            <label class="ribbon-field" for="rb-size">Size <input type="number" id="rb-size" min="4" max="96" step="0.5" aria-label="Text size"></label>
+            <div class="ribbon-group" role="group" aria-label="Blocks">
+              <span class="ribbon-title">Blocks</span>
+              <button class="btn" id="tx-merge" title="Join this block with another one you pick">Merge with&hellip;</button>
+              <button class="btn" id="tx-split" title="Split this block where you click on the page">Split&hellip;</button>
+            </div>
+            <span class="ribbon-sep"></span>
+            <div class="ribbon-group" role="group" aria-label="Text">
+              <span class="ribbon-title">Text</span>
+              <label class="ribbon-field" for="rb-font">Font <select id="rb-font" aria-label="Font"></select></label>
+              <label class="ribbon-field" for="rb-size">Size <input type="number" id="rb-size" min="4" max="96" step="0.5" aria-label="Text size"></label>
+            </div>
             <span class="ribbon-note" id="rb-note"></span>
+          </div>
+          <div class="ribbon" id="rd-ribbon" hidden>
+            <div class="ribbon-group" role="group" aria-label="Redaction">
+              <span class="ribbon-title">Redact</span>
+              <label class="ribbon-field" for="rd-mark">Leave the area
+                <select id="rd-mark" aria-label="What the area looks like once applied">
+                  <option value="black">Blacked out</option>
+                  <option value="white">Blank</option>
+                  <option value="none">As it was, text removed</option>
+                </select></label>
+              <button class="btn" id="rd-clear" title="Remove every marked area">Clear all</button>
+            </div>
+            <span class="ribbon-sep"></span>
+            <div class="ribbon-group ribbon-status" role="status">
+              <span id="rd-count"></span>
+              <span class="muted" id="rd-total"></span>
+            </div>
+            <span class="ribbon-note" id="rd-note">Drag a box over anything that must go. The text underneath is <b>deleted from the file</b>, not covered, so it can&rsquo;t be copied back out. Pictures and scanned pages are not touched &mdash; black those out or flatten the page yourself, and check the result before sharing.</span>
           </div>
             <div class="viewer-bar">
               <div class="grp nav">
@@ -677,22 +709,7 @@
               </div>
             </div>
           </div>
-<div id="edit-redactpanel" hidden>
-            <div class="props">
-              <div class="prophead"><b>Redact</b><button class="btn" id="rd-clear">Clear all</button></div>
-              <div class="hint">Drag a box over anything that must be removed &mdash; names, ID numbers, addresses. The text underneath is <b>deleted from the file</b>, not covered over, so it can't be copied back out.</div>
-              <label class="field-label" for="rd-mark">When applied, the area should be</label>
-              <select id="rd-mark">
-                <option value="black">Blacked out (the usual redaction mark)</option>
-                <option value="white">Left blank</option>
-                <option value="none">Left as it is, with only the text removed</option>
-              </select>
-              <div class="hint" id="rd-count"></div>
-              <div class="hint muted" id="rd-total"></div>
-              <div class="warnline">Check the result before sharing. Anything drawn as part of a picture, and any scanned page, must be handled by flattening or blacking out the image itself &mdash; this removes text.</div>
-            </div>
-          </div>
-          <div id="sigbox" hidden>        <div class="sigbox">
+<div id="sigbox" hidden>        <div class="sigbox">
           <div class="sighead">Your signature</div>
 
           <div class="sigrow" id="sig-saved" hidden>
@@ -3083,7 +3100,7 @@ else if (typeof exports === 'object')
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
     const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" ||
-                       textPanelNeeded || ed.mode === "redact" || ($("f-flatten").checked && ed.fields.length);
+                       textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
     const wa = $("workarea"), had = wa.classList.contains("has-props");
     wa.classList.toggle("has-props", !!needsProps);
     // the page column changes width when that column appears, so re-fit the page
@@ -3092,7 +3109,8 @@ else if (typeof exports === 'object')
     $("edit-textpanel").hidden = ed.mode !== "text";
     const rib = $("tx-ribbon");
     if (rib) { rib.hidden = ed.mode !== "text" || !ed.view; renderRibbon(); }
-    $("edit-redactpanel").hidden = ed.mode !== "redact";
+    const rdRib = $("rd-ribbon");
+    if (rdRib) rdRib.hidden = ed.mode !== "redact" || !ed.view;
     $("edit-hint").hidden = !annot;
     $("edit-hint").textContent = ed.tool ? TOOL_HINTS[ed.tool] : (ed.sel !== null ? "Drag to move. Drag the gold corner to resize." : "Pick a tool, then tap the page. Tap anything you've added to move, resize, or change it.");
     $("edit-hint").classList.toggle("warnline", ed.tool === "white");
@@ -3448,7 +3466,7 @@ else if (typeof exports === 'object')
     if (unchanged) ed.textEdits.delete(ed.tsel);
     else {
       const docFont = activeDocFont(b);
-      blockEdit(ed.tsel, { text: value, fontName: font, size,
+      blockEdit(ed.tsel, { text: value, autoWrapped: false, fontName: font, size,
         docFontRes: docFont ? docFont.name : null,
         docFontCodes: docFont ? docFont : null });
     }
@@ -3824,6 +3842,32 @@ else if (typeof exports === 'object')
   // The original operator is deleted from the stream, so whatever was behind it stays.
   // Rewrites whole paragraphs: every original line of the block is removed, and the new
   // text is laid out again inside the block's box (which the person may have moved).
+  // Wrap that keeps every character: at each break exactly one space becomes the line break
+  // and nothing else is dropped or collapsed, so offsets into the text are the same before
+  // and after. Spaces left at the end of a line are allowed to hang past the edge. This is
+  // what on-page typing needs; a caret counted in characters stays where it was.
+  function wrapExact(font, text, size, maxW){
+    const out = [];
+    for (const para of String(text).split("\n")) {
+      const parts = para.split(/(\s+)/);                  // words and the runs between them
+      let line = "", pendingSep = "";
+      for (let k = 0; k < parts.length; k++) {
+        const part = parts[k];
+        if (k % 2 === 1) { pendingSep = part; continue; }
+        const word = part;
+        if (k === 0) { line = word; continue; }
+        const cand = line + pendingSep + word;
+        if (!word || font.widthOfTextAtSize(cand.replace(/\s+$/, ""), size) <= maxW || !line.trim()) line = cand;
+        else {
+          out.push(line + pendingSep.slice(1));              // one space of the run is the break
+          line = word;
+        }
+        pendingSep = "";
+      }
+      out.push(line + pendingSep);
+    }
+    return out;
+  }
   function wrapToWidth(font, text, size, maxW){
     const out = [];
     for (const para of String(text).split("\n")) {
@@ -4520,12 +4564,19 @@ else if (typeof exports === 'object')
     const size = e0.size || b.size;
     const info = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
     const measure = (t, sz) => info && info.usable ? widthWithDocFont(info, t, sz) : t.length * sz * 0.5;
-    const overflowing = lines.length > 1 && lines.some(l => measure(l, size) > width * 1.02);
+    const overflowing = lines.length > 1 && lines.some(l => measure(l.replace(/\s+$/, ""), size) > width * 1.02);
     let text = lines.join("\n");
-    if (overflowing) {
+    // Once the tool has wrapped a block, the line breaks in it are its own doing and not the
+    // writer's, so every edit re-flows it: text that shrinks (backspace, deleting a word)
+    // comes back up onto the previous line instead of staying stranded where the wrap put it.
+    const reflow = overflowing || e0.autoWrapped;
+    if (reflow) {
+      // Nothing is dropped or collapsed here, so the caret's character offset is unchanged.
       const caret = caretOffsetIn(els);
-      text = wrapToWidth({ widthOfTextAtSize: measure }, lines.join(" ").replace(/\s+/g, " ").trim(), size, width).join("\n");
-      blockEdit(i, { text: text });
+      const flowed = wrapExact({ widthOfTextAtSize: measure }, lines.join(" "), size, width).join("\n");
+      if (flowed === text) { blockEdit(i, { text: text, autoWrapped: true }); editSummary(); editUi(); return; }
+      text = flowed;
+      blockEdit(i, { text: text, autoWrapped: true });
       drawLayer();
       restoreCaret(i, caret);
       editSummary(); editUi();
@@ -4535,6 +4586,30 @@ else if (typeof exports === 'object')
     const ta = $("tx-text");
     if (ta && document.activeElement !== ta) ta.value = lines.join("\n");
     editSummary(); editUi();
+  }
+
+  // A wrapped line is its own element, so Backspace at the start of one (or Delete at the
+  // end of one) has nothing to act on. The break there was put in by the wrap and stands for
+  // a space, so deleting it means joining the two lines; the reflow then redistributes them.
+  function joinWrappedLines(ev, i, el){
+    const e0 = ed.textEdits.get(i);
+    if (!e0 || !e0.autoWrapped) return;
+    const sel = window.getSelection();
+    if (!sel || !sel.isCollapsed || !sel.anchorNode || !(el === sel.anchorNode || el.contains(sel.anchorNode))) return;
+    const li = +el.dataset.line;
+    const lineEl = k => eLayer.querySelector('.tprev[data-line="' + k + '"]');
+    let first = null, second = null;
+    if (ev.key === "Backspace" && sel.anchorOffset === 0 && (first = lineEl(li - 1))) second = el;
+    else if (ev.key === "Delete" && sel.anchorOffset >= el.textContent.length && (second = lineEl(li + 1))) first = el;
+    if (!first || !second) return;
+    ev.preventDefault();
+    const at = first.textContent.length;
+    first.textContent = first.textContent + second.textContent;
+    second.remove();
+    const r = document.createRange();
+    r.setStart(first.firstChild || first, first.firstChild ? at : 0); r.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r);
+    onPageEdit(i);
   }
 
   // Where the caret sits, counted in characters from the start of the block.
@@ -4590,7 +4665,13 @@ else if (typeof exports === 'object')
     const fits = !e.resized && typed.length === b.lineBoxes.length &&
       (!helv || typed.every((ln, k) => helv.widthOfTextAtSize(ln, size) <= Math.max(b.lineBoxes[k].w, width) * 1.02));
     const places = [];
-    if (fits) typed.forEach((ln, k) => places.push({ text: ln, x: b.lineBoxes[k].x + dx, y: b.lineBoxes[k].y + dy }));
+    // While someone types on the page, the lines they see are the text; laying them out a
+    // second time with different metrics would move words between lines and drop spaces.
+    const exact = !fits && ed.typing === i && e.autoWrapped;
+    if (exact) {
+      const leading = b.leading > size * 0.8 ? b.leading : size * LINE;
+      typed.forEach((ln, k) => places.push({ text: ln, x, y: top - size - k * leading }));
+    } else if (fits) typed.forEach((ln, k) => places.push({ text: ln, x: b.lineBoxes[k].x + dx, y: b.lineBoxes[k].y + dy }));
     else {
       const lines = [];
       typed.forEach(t => {
@@ -4620,6 +4701,7 @@ else if (typeof exports === 'object')
         el.addEventListener("input", () => onPageEdit(i));
         el.addEventListener("keydown", ev => {
           if (ev.key === "Escape") { ev.preventDefault(); ed.typing = null; el.blur(); drawLayer(); editUi(); }
+          else if (ev.key === "Backspace" || ev.key === "Delete") joinWrappedLines(ev, i, el);
           ev.stopPropagation();          // Delete belongs to the text, not the block
         });
         el.addEventListener("pointerdown", ev => ev.stopPropagation());
@@ -5252,6 +5334,9 @@ else if (typeof exports === 'object')
     });
     if (!rep.js && nameTreeHas(doc, "JavaScript")) rep.js = Math.max(1, countNameTree(doc, "JavaScript"));
     rep.attachments += countNameTree(doc, "EmbeddedFiles");
+    // PDF 2.0 / PDF-A3 "associated files" live in /AF as well, and newer writers record an
+    // attachment there in addition to the name tree; count it only if it adds files.
+    { const af = doc.catalog.lookup(N("AF")); if (af instanceof PDFArray && af.size() > rep.attachments) rep.attachments = af.size(); }
     const raw = new Uint8Array(info.bytes);
     rep.revisions = Math.max(1, countOccurrences(raw, "startxref"));
     // dry-run garbage collection on a throwaway copy to count unused objects
@@ -5297,6 +5382,8 @@ else if (typeof exports === 'object')
   function stripAttachments(doc){
     const names = doc.catalog.lookup(N("Names"));
     if (names instanceof PDFDict) names.delete(N("EmbeddedFiles"));
+    // associated files (/AF) can hang off the catalog, pages, annotations and form objects
+    walkAll(doc, d => d.delete(N("AF")));
     doc.getPages().forEach(pg => {
       const annots = pg.node.lookup(N("Annots"));
       if (!(annots instanceof PDFArray)) return;

@@ -57,6 +57,7 @@ def mjs(path, glob, names=None):
 
 scripts=[('fonts: Inter, Barlow Condensed, Great Vibes, Dancing Script, Allura (OFL-1.1); Homemade Apple (Apache-2.0); PDF standard fonts: Foxit (BSD-style, see pdf.js), Liberation Sans (OFL-1.1)',fontjs),
          ('@cantoo/pdf-lib 2.11.1, maintained fork of pdf-lib (MIT)',lib(firstPath('cantoo/package/dist/pdf-lib.min.js',
+                                      'cantoo/node_modules/@cantoo/pdf-lib/package/dist/pdf-lib.min.js',
                                       'cantoo/node_modules/@cantoo/pdf-lib/dist/pdf-lib.min.js'))),
          ('pdf.js 4.10.38 worker, run in-page (Apache-2.0)',mjs('pdfjs4/package/legacy/build/pdf.worker.min.mjs','pdfjsWorker',['WorkerMessageHandler']),'module'),
          ('pdf.js 4.10.38 (Apache-2.0)',mjs('pdfjs4/package/legacy/build/pdf.min.mjs','pdfjsLib'),'module'),
