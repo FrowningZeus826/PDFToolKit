@@ -230,46 +230,72 @@
   .docbar-actions { display: flex; gap: 8px; flex: 0 0 auto; }
   .docbar .status { max-width: 980px; margin: 8px auto 0; }
   .docbar .status:empty { display: none; }
-  /* ---------- Document workspace: icon strip | page | properties ---------- */
-  .workarea { display: grid; grid-template-columns: 56px minmax(0, 1fr) 0px; gap: 16px; align-items: start; margin-top: 6px; }
-  .stagecol .stage-wrap { max-height: calc(100vh - 120px); }
-  /* Document first: the properties column floats over the page rather than taking a third
-     of the width from it. It still sits in the grid on wide screens, where there is room
-     for both; below that it becomes a panel over the page edge. */
-  .workarea.has-props { grid-template-columns: 56px minmax(0, 1fr) 320px; }
-  @media (max-width: 1500px) {
-    .workarea.has-props { grid-template-columns: 56px minmax(0, 1fr) 0px; }
-    .workarea.has-props .ctlcol {
-      position: fixed; right: 16px; top: 128px; width: 340px; max-width: calc(100vw - 32px);
-      max-height: calc(100vh - 160px); overflow: auto; z-index: 45;
-      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px;
-    }
-  }
+  /* ---------- Document workspace: one ribbon above the page ---------- */
+  .docribbon { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: 6px 0 10px; }
+  .rtabs { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; padding: 0 8px 0 4px; border-bottom: 1px solid var(--line); }
+  .docribbon.collapsed .rtabs { border-bottom: none; }
+  .rtablist { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .rtablist::-webkit-scrollbar { display: none; }
+  .rtablist .segbtn { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 9px 13px 7px;
+    font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+  .rtablist .segbtn + .segbtn { border-left: none; }
+  .rtablist .segbtn:hover:not(:disabled) { color: var(--ink); }
+  .rtablist .segbtn.active { background: none; color: var(--ink); font-weight: 600; border-bottom-color: var(--gold); }
+  .rtools.viewer-bar { margin: 0 0 0 auto; padding: 3px 0; justify-content: flex-end; }
+  .rapply { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+  .rsummary { font-size: 12px; color: var(--ink-soft); max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rgo { padding: 6px 14px; font-size: 13px; }
+  .rbody { display: flex; align-items: center; gap: 12px; padding: 6px 10px 8px; }
+  .rbody > .rpane { flex: 1 1 auto; min-width: 0; }
+  .rbody > .rapply { margin-left: auto; flex: 0 0 auto; }
+  .docribbon.collapsed .rbody { display: none; }
+  /* tucked away, Apply only shows up when there is something to apply */
+  .docribbon.collapsed .rapply:has(#edit-go:disabled) { display: none; }
+  .rpane { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-height: 52px; }
+  .rpane[hidden] { display: none; }
+  .rpane .checkline { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .rpane .ribbon-field input[type=text], .rpane input[type=text] { width: 150px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .rpane .ribbon-field input[type=number], .rpane input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .rpane input[type=range] { width: 84px; }
+  .rtools .dfname { display: none; }   /* the file's name is already in the bar above */
+  #edit-hint { flex: 1 1 240px; }
+  /* the page takes the whole width; anything contextual floats over its edge */
+  .workarea { display: block; margin-top: 0; }
+  .stagecol { min-width: 0; }
+  .stagecol .stage-wrap { max-height: calc(100vh - 215px); }
+  .docribbon.collapsed ~ .workarea .stage-wrap { max-height: calc(100vh - 140px); }
+  .ctlcol { min-width: 0; position: fixed; right: 16px; top: 224px; width: 340px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 250px); overflow: auto; z-index: 45; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; }
+  .docribbon.collapsed ~ .workarea .ctlcol { top: 150px; }
+  .workarea:not(.has-props) .ctlcol { display: none; }
+  .ctlcol .props:first-child { margin-top: 0; }
+  /* Word-style tool buttons: icon over a label */
+  #annot-tools { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; }
+  #annot-tools .tool { flex-direction: column; justify-content: center; gap: 3px; width: 56px; height: 50px; padding: 4px 2px 3px;
+    background: none; border: 1px solid transparent; position: relative; }
+  #annot-tools .tool svg { width: 20px; height: 20px; margin: 0; }
+  #annot-tools .tlabel { position: static; transform: none; opacity: 1; background: none; color: inherit; font-size: 11px; line-height: 1;
+    padding: 0; box-shadow: none; pointer-events: none; }
+  #annot-tools .tool:hover { background: var(--canvas); border-color: var(--line); }
+  #annot-tools .tool.active { background: var(--black); color: var(--gold); border-color: var(--black); }
   @media (max-width: 760px) {
-    .workarea.has-props .ctlcol { position: static; width: auto; max-height: none; box-shadow: none; padding: 0; border: none; background: none; }
-  }
-  /* above the page: the page column paints later in the document, so the strip needs
-     its own stacking context to keep tooltips on top */
-  .toolstrip { position: sticky; top: 74px; z-index: 40; }
-  .stagecol { position: sticky; top: 74px; min-width: 0; z-index: 1; }
-  .ctlcol { min-width: 0; overflow: hidden; }
-  .workarea:not(.has-props) .ctlcol { opacity: 0; pointer-events: none; }
-  /* icon-only tools, label on hover/focus */
-  #annot-tools { display: flex; flex-direction: column; gap: 6px; margin: 0; }
-  #annot-tools .tool { position: relative; width: 52px; height: 46px; padding: 0; display: flex; align-items: center; justify-content: center; }
-  #annot-tools .tool svg { width: 21px; height: 21px; margin: 0; }
-  #annot-tools .tlabel { position: absolute; left: 58px; top: 50%; transform: translateY(-50%); white-space: nowrap;
-    background: #17140F; color: #FFFFFF; font-size: 12px; padding: 4px 8px; border-radius: 4px; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 60; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
-  #annot-tools .tool:hover .tlabel, #annot-tools .tool:focus-visible .tlabel { opacity: 1; }
-  @media (max-width: 1040px) {
-    .workarea, .workarea.has-props { grid-template-columns: 1fr; gap: 12px; }
-    .toolstrip, .stagecol { position: static; }
-    .toolstrip { order: 1; } .ctlcol { order: 2; } .stagecol { order: 3; }
-    .workarea:not(.has-props) .ctlcol { display: none; }
-    #annot-tools { flex-direction: row; flex-wrap: wrap; }
-    #annot-tools .tool { width: 44px; height: 42px; }
-    #annot-tools .tlabel { left: 50%; top: auto; bottom: -26px; transform: translateX(-50%); }
+    .ctlcol { position: static; width: auto; max-height: none; box-shadow: none; padding: 0; border: none; background: none; margin-top: 10px; }
+    .docribbon.collapsed ~ .workarea .ctlcol { top: auto; }
+    .stagecol .stage-wrap, .docribbon.collapsed ~ .workarea .stage-wrap { max-height: none; }
+    .rtabs { gap: 0; padding: 0 6px; }
+    .rtablist { flex: 1 1 100%; }
+    .rtools.viewer-bar { flex: 1 1 100%; margin-left: 0; justify-content: space-between; gap: 4px 6px; padding: 2px 0 5px; }
+    .rtools .btn { padding: 4px 8px; font-size: 13px; }
+    .rtools .btn.icon { min-width: 30px; padding: 4px 8px; }
+    .rtools .zoomval { display: none; }
+    .rtools .grp { gap: 4px; }
+    .rbody { flex-wrap: wrap; padding: 4px 8px 8px; }
+    .rbody > .rapply { margin-left: 0; width: 100%; }
+    .rbody > .rapply .rgo { flex: 1 1 auto; }
+    #annot-tools { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }
+    #annot-tools .tool { flex: 0 0 auto; width: 52px; }
+    #edit-hint { display: none; }
   }
   /* the overlay layer ignores pointer events, so these have to take them back */
   .trun { position: absolute; border-radius: 2px; cursor: pointer; pointer-events: auto; touch-action: manipulation;
@@ -319,10 +345,8 @@
   .selftest .bad { color: var(--bad); }
   /* the editing ribbons: fixed above the page, like a word processor's. Controls sit in
      small labelled groups so a long row reads as a few things, not a dozen. */
-  .ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 12px; margin-bottom: 8px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
-  .ribbon[hidden] { display: none; }
-  .ribbon .btn { padding: 5px 10px; font-size: 13px; }
+  .rpane { font-size: 13px; }
+  .rpane .btn { padding: 5px 10px; font-size: 13px; }
   .ribbon-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .ribbon-title { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
   .ribbon-status { color: var(--ink); font-weight: 500; }
@@ -332,7 +356,7 @@
   .ribbon-field input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
   .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; line-height: 1.4; }
   .ribbon-note.warn { color: var(--bad); }
-  @media (max-width: 640px) { .ribbon-sep { display: none; } .ribbon { gap: 8px 10px; } }
+  @media (max-width: 640px) { .ribbon-sep { display: none; } .rpane { gap: 8px 10px; } }
   .groupctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
   .groupctl input[type=range] { width: 92px; }
   .groupctl span { min-width: 54px; }
@@ -426,6 +450,7 @@
   .ink.active { border-color: var(--gold-dim); box-shadow: 0 0 0 2px rgba(255,182,18,.3); }
   .btn.strong { background: var(--black); color: var(--gold); border-color: var(--black); font-weight: 600; }
   .btn.strong:hover:not(:disabled) { background: #262319; }
+  .btn.strong:disabled { opacity: .35; cursor: not-allowed; }
   /* ---------- Mobile: rail becomes a top tab strip ---------- */
   @media (max-width: 760px) {
     .top-lock span { display: none; }

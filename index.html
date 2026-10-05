@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-46FUplMe0mTGLnvL9jwfYM5iKGzAy7C0SqnMwKkYky0=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-uCBwbpsOIKtzrSlnfK2KCXkghKoTh3a3Ax1jMEPvwJE=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -240,46 +240,72 @@
   .docbar-actions { display: flex; gap: 8px; flex: 0 0 auto; }
   .docbar .status { max-width: 980px; margin: 8px auto 0; }
   .docbar .status:empty { display: none; }
-  /* ---------- Document workspace: icon strip | page | properties ---------- */
-  .workarea { display: grid; grid-template-columns: 56px minmax(0, 1fr) 0px; gap: 16px; align-items: start; margin-top: 6px; }
-  .stagecol .stage-wrap { max-height: calc(100vh - 120px); }
-  /* Document first: the properties column floats over the page rather than taking a third
-     of the width from it. It still sits in the grid on wide screens, where there is room
-     for both; below that it becomes a panel over the page edge. */
-  .workarea.has-props { grid-template-columns: 56px minmax(0, 1fr) 320px; }
-  @media (max-width: 1500px) {
-    .workarea.has-props { grid-template-columns: 56px minmax(0, 1fr) 0px; }
-    .workarea.has-props .ctlcol {
-      position: fixed; right: 16px; top: 128px; width: 340px; max-width: calc(100vw - 32px);
-      max-height: calc(100vh - 160px); overflow: auto; z-index: 45;
-      background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
-      box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px;
-    }
-  }
+  /* ---------- Document workspace: one ribbon above the page ---------- */
+  .docribbon { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; margin: 6px 0 10px; }
+  .rtabs { display: flex; align-items: center; flex-wrap: wrap; gap: 0 12px; padding: 0 8px 0 4px; border-bottom: 1px solid var(--line); }
+  .docribbon.collapsed .rtabs { border-bottom: none; }
+  .rtablist { display: flex; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+  .rtablist::-webkit-scrollbar { display: none; }
+  .rtablist .segbtn { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 9px 13px 7px;
+    font-size: 13px; color: var(--ink-soft); white-space: nowrap; }
+  .rtablist .segbtn + .segbtn { border-left: none; }
+  .rtablist .segbtn:hover:not(:disabled) { color: var(--ink); }
+  .rtablist .segbtn.active { background: none; color: var(--ink); font-weight: 600; border-bottom-color: var(--gold); }
+  .rtools.viewer-bar { margin: 0 0 0 auto; padding: 3px 0; justify-content: flex-end; }
+  .rapply { display: flex; align-items: center; gap: 10px; padding: 3px 0; }
+  .rsummary { font-size: 12px; color: var(--ink-soft); max-width: 210px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rgo { padding: 6px 14px; font-size: 13px; }
+  .rbody { display: flex; align-items: center; gap: 12px; padding: 6px 10px 8px; }
+  .rbody > .rpane { flex: 1 1 auto; min-width: 0; }
+  .rbody > .rapply { margin-left: auto; flex: 0 0 auto; }
+  .docribbon.collapsed .rbody { display: none; }
+  /* tucked away, Apply only shows up when there is something to apply */
+  .docribbon.collapsed .rapply:has(#edit-go:disabled) { display: none; }
+  .rpane { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; min-height: 52px; }
+  .rpane[hidden] { display: none; }
+  .rpane .checkline { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+  .rpane .ribbon-field input[type=text], .rpane input[type=text] { width: 150px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .rpane .ribbon-field input[type=number], .rpane input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .rpane input[type=range] { width: 84px; }
+  .rtools .dfname { display: none; }   /* the file's name is already in the bar above */
+  #edit-hint { flex: 1 1 240px; }
+  /* the page takes the whole width; anything contextual floats over its edge */
+  .workarea { display: block; margin-top: 0; }
+  .stagecol { min-width: 0; }
+  .stagecol .stage-wrap { max-height: calc(100vh - 215px); }
+  .docribbon.collapsed ~ .workarea .stage-wrap { max-height: calc(100vh - 140px); }
+  .ctlcol { min-width: 0; position: fixed; right: 16px; top: 224px; width: 340px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 250px); overflow: auto; z-index: 45; background: var(--panel); border: 1px solid var(--line);
+    border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; }
+  .docribbon.collapsed ~ .workarea .ctlcol { top: 150px; }
+  .workarea:not(.has-props) .ctlcol { display: none; }
+  .ctlcol .props:first-child { margin-top: 0; }
+  /* Word-style tool buttons: icon over a label */
+  #annot-tools { display: flex; flex-wrap: wrap; gap: 2px; margin: 0; }
+  #annot-tools .tool { flex-direction: column; justify-content: center; gap: 3px; width: 56px; height: 50px; padding: 4px 2px 3px;
+    background: none; border: 1px solid transparent; position: relative; }
+  #annot-tools .tool svg { width: 20px; height: 20px; margin: 0; }
+  #annot-tools .tlabel { position: static; transform: none; opacity: 1; background: none; color: inherit; font-size: 11px; line-height: 1;
+    padding: 0; box-shadow: none; pointer-events: none; }
+  #annot-tools .tool:hover { background: var(--canvas); border-color: var(--line); }
+  #annot-tools .tool.active { background: var(--black); color: var(--gold); border-color: var(--black); }
   @media (max-width: 760px) {
-    .workarea.has-props .ctlcol { position: static; width: auto; max-height: none; box-shadow: none; padding: 0; border: none; background: none; }
-  }
-  /* above the page: the page column paints later in the document, so the strip needs
-     its own stacking context to keep tooltips on top */
-  .toolstrip { position: sticky; top: 74px; z-index: 40; }
-  .stagecol { position: sticky; top: 74px; min-width: 0; z-index: 1; }
-  .ctlcol { min-width: 0; overflow: hidden; }
-  .workarea:not(.has-props) .ctlcol { opacity: 0; pointer-events: none; }
-  /* icon-only tools, label on hover/focus */
-  #annot-tools { display: flex; flex-direction: column; gap: 6px; margin: 0; }
-  #annot-tools .tool { position: relative; width: 52px; height: 46px; padding: 0; display: flex; align-items: center; justify-content: center; }
-  #annot-tools .tool svg { width: 21px; height: 21px; margin: 0; }
-  #annot-tools .tlabel { position: absolute; left: 58px; top: 50%; transform: translateY(-50%); white-space: nowrap;
-    background: #17140F; color: #FFFFFF; font-size: 12px; padding: 4px 8px; border-radius: 4px; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 60; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
-  #annot-tools .tool:hover .tlabel, #annot-tools .tool:focus-visible .tlabel { opacity: 1; }
-  @media (max-width: 1040px) {
-    .workarea, .workarea.has-props { grid-template-columns: 1fr; gap: 12px; }
-    .toolstrip, .stagecol { position: static; }
-    .toolstrip { order: 1; } .ctlcol { order: 2; } .stagecol { order: 3; }
-    .workarea:not(.has-props) .ctlcol { display: none; }
-    #annot-tools { flex-direction: row; flex-wrap: wrap; }
-    #annot-tools .tool { width: 44px; height: 42px; }
-    #annot-tools .tlabel { left: 50%; top: auto; bottom: -26px; transform: translateX(-50%); }
+    .ctlcol { position: static; width: auto; max-height: none; box-shadow: none; padding: 0; border: none; background: none; margin-top: 10px; }
+    .docribbon.collapsed ~ .workarea .ctlcol { top: auto; }
+    .stagecol .stage-wrap, .docribbon.collapsed ~ .workarea .stage-wrap { max-height: none; }
+    .rtabs { gap: 0; padding: 0 6px; }
+    .rtablist { flex: 1 1 100%; }
+    .rtools.viewer-bar { flex: 1 1 100%; margin-left: 0; justify-content: space-between; gap: 4px 6px; padding: 2px 0 5px; }
+    .rtools .btn { padding: 4px 8px; font-size: 13px; }
+    .rtools .btn.icon { min-width: 30px; padding: 4px 8px; }
+    .rtools .zoomval { display: none; }
+    .rtools .grp { gap: 4px; }
+    .rbody { flex-wrap: wrap; padding: 4px 8px 8px; }
+    .rbody > .rapply { margin-left: 0; width: 100%; }
+    .rbody > .rapply .rgo { flex: 1 1 auto; }
+    #annot-tools { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; }
+    #annot-tools .tool { flex: 0 0 auto; width: 52px; }
+    #edit-hint { display: none; }
   }
   /* the overlay layer ignores pointer events, so these have to take them back */
   .trun { position: absolute; border-radius: 2px; cursor: pointer; pointer-events: auto; touch-action: manipulation;
@@ -329,10 +355,8 @@
   .selftest .bad { color: var(--bad); }
   /* the editing ribbons: fixed above the page, like a word processor's. Controls sit in
      small labelled groups so a long row reads as a few things, not a dozen. */
-  .ribbon { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 12px; margin-bottom: 8px;
-    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
-  .ribbon[hidden] { display: none; }
-  .ribbon .btn { padding: 5px 10px; font-size: 13px; }
+  .rpane { font-size: 13px; }
+  .rpane .btn { padding: 5px 10px; font-size: 13px; }
   .ribbon-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .ribbon-title { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
   .ribbon-status { color: var(--ink); font-weight: 500; }
@@ -342,7 +366,7 @@
   .ribbon-field input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
   .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; line-height: 1.4; }
   .ribbon-note.warn { color: var(--bad); }
-  @media (max-width: 640px) { .ribbon-sep { display: none; } .ribbon { gap: 8px 10px; } }
+  @media (max-width: 640px) { .ribbon-sep { display: none; } .rpane { gap: 8px 10px; } }
   .groupctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
   .groupctl input[type=range] { width: 92px; }
   .groupctl span { min-width: 54px; }
@@ -436,6 +460,7 @@
   .ink.active { border-color: var(--gold-dim); box-shadow: 0 0 0 2px rgba(255,182,18,.3); }
   .btn.strong { background: var(--black); color: var(--gold); border-color: var(--black); font-weight: 600; }
   .btn.strong:hover:not(:disabled) { background: #262319; }
+  .btn.strong:disabled { opacity: .35; cursor: not-allowed; }
   /* ---------- Mobile: rail becomes a top tab strip ---------- */
   @media (max-width: 760px) {
     .top-lock span { display: none; }
@@ -573,44 +598,37 @@
           <div class="trust"><strong>Nothing leaves this device.</strong> Every file is opened and processed inside your browser. No uploads, no server, no tracking. Closing this tab clears everything.</div>
         </div>
         <div id="edit-work" hidden>
-          <div class="seg" id="edit-modes" role="tablist" aria-label="Edit mode" style="margin-top:6px;">
+          <div class="docribbon" id="docribbon">
+            <div class="rtabs">
+              <div class="rtablist" id="edit-modes" role="tablist" aria-label="Edit mode">
             <button class="segbtn active" role="tab" aria-selected="true" data-emode="annotate">Add to page</button>
             <button class="segbtn" role="tab" aria-selected="false" data-emode="form">Fill form <span id="edit-fieldcount"></span></button>
             <button class="segbtn" role="tab" aria-selected="false" data-emode="text">Edit text</button>
             <button class="segbtn" role="tab" aria-selected="false" data-emode="redact">Redact</button>
             <button class="segbtn" role="tab" aria-selected="false" data-emode="doc">Whole document</button>
           </div>
-          
-          
-          <div id="edit-docopts" hidden>
-            <div class="checkline"><input type="checkbox" id="wm-on"><label for="wm-on"><b>Watermark</b></label></div>
-            <div class="row2">
-              <div><label class="field-label" for="wm-text">Text</label><input type="text" id="wm-text" maxlength="60" placeholder="e.g. CONFIDENTIAL"></div>
-              <div><label class="field-label" for="wm-style">Placement</label>
-                <select id="wm-style"><option value="diagonal" selected>Diagonal across the page</option><option value="top">Across the top</option><option value="bottom">Across the bottom</option></select></div>
+              <div class="viewer-bar rtools">
+              <div class="grp nav">
+                <button class="btn icon" id="e-prev" aria-label="Previous page" title="Previous page">&lsaquo;</button>
+                <span class="pg" id="e-label">Page 1 of 1</span>
+                <button class="btn icon" id="e-next" aria-label="Next page" title="Next page">&rsaquo;</button>
+              </div>
+              <div class="grp zoom">
+                <button class="btn icon" id="e-zout" aria-label="Zoom out" title="Zoom out">&minus;</button>
+                <span class="zoomval" id="e-zoom">Fit</span>
+                <button class="btn icon" id="e-zin" aria-label="Zoom in" title="Zoom in">+</button>
+                <button class="btn" id="e-fit" title="Switch between fitting the whole page and filling the width">Width</button>
+              </div>
+              <div class="grp file">
+                <span class="dfname" id="edit-name"></span>
+                <label class="btn" id="edit-open" tabindex="0" role="button" title="Open another PDF">Open<input type="file" id="edit-input2" class="vh" accept="application/pdf,.pdf"></label>
+                <button class="btn icon" id="rb-collapse" aria-expanded="true" aria-controls="rbody" title="Hide the ribbon to read" aria-label="Hide the ribbon">&#8963;</button>
+              </div>
             </div>
-            <div class="row2">
-              <div><label class="field-label" for="wm-color">Color</label>
-                <select id="wm-color"><option value="#808080" selected>Gray</option><option value="#B3261E">Red</option><option value="#1E3A8A">Blue</option><option value="#000000">Black</option></select></div>
-              <div><label class="field-label" for="wm-opacity">Strength</label>
-                <div class="size-row"><input type="range" id="wm-opacity" min="10" max="80" step="5" value="25"><span id="wm-opv">25%</span></div></div>
             </div>
-            <div class="checkline" style="margin-top:14px;"><input type="checkbox" id="pn-on"><label for="pn-on"><b>Page numbers</b></label></div>
-            <div class="row2">
-              <div><label class="field-label" for="pn-format">Format</label>
-                <select id="pn-format"><option value="n">1</option><option value="page">Page 1</option><option value="pageof" selected>Page 1 of 10</option><option value="dash">&ndash; 1 &ndash;</option></select></div>
-              <div><label class="field-label" for="pn-pos">Position</label>
-                <select id="pn-pos"><option value="bottom-center" selected>Bottom centre</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-center">Top centre</option></select></div>
-            </div>
-            <div class="row2">
-              <div><label class="field-label" for="pn-start">Start at</label><input type="number" id="pn-start" min="1" max="9999" value="1"></div>
-              <div><div class="checkline" style="margin-top:26px;"><input type="checkbox" id="pn-skip1"><label for="pn-skip1">Skip the first page (cover)</label></div></div>
-            </div>
-            <div class="hint">Applies to every page. Flip through the pages above to check the placement.</div>
-          </div>
-          <div class="workarea" id="workarea">
-          <div class="toolstrip">
-          <div class="toolrow" id="annot-tools" role="toolbar" aria-label="Add to page">
+            <div class="rbody" id="rbody">
+              <div class="rpane" id="rp-annotate">
+            <div class="toolrow" id="annot-tools" role="toolbar" aria-label="Add to page">
             <button class="tool" data-tool="text" title="Text" aria-label="Text"><svg viewBox="0 0 24 24"><path d="M5 5h14M12 5v14M9 19h6"/></svg><span class="tlabel">Text</span></button>
             <button class="tool" data-tool="date" title="Date" aria-label="Date"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="tlabel">Date</span></button>
             <button class="tool" data-tool="check" title="Check" aria-label="Check"><svg viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></svg><span class="tlabel">Check</span></button>
@@ -621,10 +639,16 @@
             <button class="tool" id="sig-tool" data-tool="signature" title="Signature" aria-label="Signature"><svg viewBox="0 0 24 24"><path d="M3 18c3-1 5-4 7-8s4-6 6-6 2 2 0 4-6 5-6 8 3 2 5 0"/><path d="M14 20h7"/></svg><span class="tlabel">Signature</span></button>
             <label class="tool" id="tool-image" tabindex="0" role="button" title="Image" aria-label="Image"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/></svg><span class="tlabel">Image</span><input type="file" id="edit-img-input" class="vh" accept="image/png,image/jpeg"></label>
           </div>
-
+            <div class="ribbon-note" id="edit-hint"></div>
           </div>
-          <div class="stagecol">
-          <div class="ribbon" id="tx-ribbon" hidden>
+              <div class="rpane" id="rp-form" hidden>
+            <span class="ribbon-note" id="rp-form-note">Tap a field on the page to fill it, or step through them with Previous and Next.</span>
+            <div class="checkline" id="flatten-line" hidden>
+            <input type="checkbox" id="f-flatten">
+            <label for="f-flatten">Lock the answers (flatten the form) so they can't be changed later</label>
+          </div>
+          </div>
+              <div class="rpane" id="tx-ribbon" hidden>
             <div class="ribbon-group" role="group" aria-label="Grouping">
               <span class="ribbon-title">Grouping</span>
               <label class="groupctl" for="tx-group">
@@ -646,7 +670,7 @@
             </div>
             <span class="ribbon-note" id="rb-note"></span>
           </div>
-          <div class="ribbon" id="rd-ribbon" hidden>
+              <div class="rpane" id="rd-ribbon" hidden>
             <div class="ribbon-group" role="group" aria-label="Redaction">
               <span class="ribbon-title">Redact</span>
               <label class="ribbon-field" for="rd-mark">Leave the area
@@ -662,30 +686,39 @@
               <span id="rd-count"></span>
               <span class="muted" id="rd-total"></span>
             </div>
-            <span class="ribbon-note" id="rd-note">Drag a box over anything that must go. The text underneath is <b>deleted from the file</b>, not covered, so it can&rsquo;t be copied back out. Pictures and scanned pages are not touched &mdash; black those out or flatten the page yourself, and check the result before sharing.</span>
+            <span class="ribbon-note" id="rd-note">The text under a marked area is <b>deleted from the file</b>, not just covered. Pictures and scanned pages are not touched &mdash; check the result before sharing.</span>
           </div>
-            <div class="viewer-bar">
-              <div class="grp nav">
-                <button class="btn icon" id="e-prev" aria-label="Previous page" title="Previous page">&lsaquo;</button>
-                <span class="pg" id="e-label">Page 1 of 1</span>
-                <button class="btn icon" id="e-next" aria-label="Next page" title="Next page">&rsaquo;</button>
-              </div>
-              <div class="grp zoom">
-                <button class="btn icon" id="e-zout" aria-label="Zoom out" title="Zoom out">&minus;</button>
-                <span class="zoomval" id="e-zoom">Fit</span>
-                <button class="btn icon" id="e-zin" aria-label="Zoom in" title="Zoom in">+</button>
-                <button class="btn" id="e-fit" title="Switch between fitting the whole page and filling the width">Width</button>
-              </div>
-              <div class="grp file">
-                <span class="dfname" id="edit-name"></span>
-                <label class="btn" id="edit-open" tabindex="0" role="button" title="Open another PDF">Open<input type="file" id="edit-input2" class="vh" accept="application/pdf,.pdf"></label>
+              <div class="rpane" id="edit-docopts" hidden>
+            <div class="ribbon-group" role="group" aria-label="Watermark">
+              <span class="checkline"><input type="checkbox" id="wm-on"><label for="wm-on"><b>Watermark</b></label></span>
+              <label class="ribbon-field" for="wm-text">Text <input type="text" id="wm-text" maxlength="60" placeholder="e.g. CONFIDENTIAL"></label>
+              <label class="ribbon-field" for="wm-style">Placement <select id="wm-style"><option value="diagonal" selected>Diagonal across the page</option><option value="top">Across the top</option><option value="bottom">Across the bottom</option></select></label>
+              <label class="ribbon-field" for="wm-color">Color <select id="wm-color"><option value="#808080" selected>Gray</option><option value="#B3261E">Red</option><option value="#1E3A8A">Blue</option><option value="#000000">Black</option></select></label>
+              <label class="ribbon-field" for="wm-opacity">Strength <input type="range" id="wm-opacity" min="10" max="80" step="5" value="25"><span id="wm-opv">25%</span></label>
+            </div>
+            <span class="ribbon-sep"></span>
+            <div class="ribbon-group" role="group" aria-label="Page numbers">
+              <span class="checkline"><input type="checkbox" id="pn-on"><label for="pn-on"><b>Page numbers</b></label></span>
+              <label class="ribbon-field" for="pn-format">Format <select id="pn-format"><option value="n">1</option><option value="page">Page 1</option><option value="pageof" selected>Page 1 of 10</option><option value="dash">&ndash; 1 &ndash;</option></select></label>
+              <label class="ribbon-field" for="pn-pos">Position <select id="pn-pos"><option value="bottom-center" selected>Bottom centre</option><option value="bottom-right">Bottom right</option><option value="bottom-left">Bottom left</option><option value="top-right">Top right</option><option value="top-center">Top centre</option></select></label>
+              <label class="ribbon-field" for="pn-start">Start at <input type="number" id="pn-start" min="1" max="9999" value="1"></label>
+              <span class="checkline"><input type="checkbox" id="pn-skip1"><label for="pn-skip1">Skip the first page</label></span>
+            </div>
+            <span class="ribbon-note">Applies to every page. Flip through the pages to check the placement.</span>
+          </div>
+              <div class="rapply" id="rapply">
+                <div class="count rsummary" id="edit-summary"></div>
+                <button class="btn strong rgo" id="edit-go" disabled>Apply changes</button>
               </div>
             </div>
-            <div class="stage-wrap">
+          </div>
+          <div class="workarea" id="workarea">
+            <div class="stagecol">
+              <div class="stage-wrap">
               <div class="stage estage mode-annot" id="estage"><canvas id="estage-canvas"></canvas><div class="olayer" id="eolayer"></div></div>
             </div>
-          </div>
-          <div class="ctlcol">
+            </div>
+            <div class="ctlcol">
 <div id="edit-textpanel" hidden>
             <div class="props">
               <div id="tx-locked" hidden>
@@ -751,9 +784,8 @@
           </div>
         </div>
           </div>
-          <div class="hint" id="edit-hint" style="margin-bottom:10px;"></div>
-          <div class="props" id="eprops" hidden></div>
-          <div class="props" id="fpanel" hidden>
+<div class="props" id="eprops" hidden></div>
+<div class="props" id="fpanel" hidden>
             <div class="prophead"><b id="f-label"></b><span class="muted" id="f-pos"></span></div>
             <div id="f-input"></div>
             <div class="fnav">
@@ -761,14 +793,9 @@
               <button class="btn strong" id="f-next">Next field &rsaquo;</button>
             </div>
           </div>
-          <div class="checkline" id="flatten-line" hidden>
-            <input type="checkbox" id="f-flatten">
-            <label for="f-flatten">Lock the answers (flatten the form) so they can't be changed later</label>
+            </div>
           </div>
-          <div class="count" id="edit-summary"></div>
-          </div></div>
         </div>
-        <button class="primary" id="edit-go" disabled>Apply changes</button>
         <div class="status" id="edit-status" role="status"></div>
       </div>
     </section>
@@ -3101,10 +3128,11 @@ else if (typeof exports === 'object')
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
     const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" ||
                        textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
-    const wa = $("workarea"), had = wa.classList.contains("has-props");
-    wa.classList.toggle("has-props", !!needsProps);
-    // the page column changes width when that column appears, so re-fit the page
-    if (had !== !!needsProps && ed.view) requestAnimationFrame(() => editRender());
+    // contextual panels float over the page edge instead of taking a column, so the page
+    // keeps its width whether or not one is showing
+    $("workarea").classList.toggle("has-props", !!needsProps);
+    $("rp-annotate").hidden = ed.mode !== "annotate";
+    $("rp-form").hidden = ed.mode !== "form";
     $("edit-docopts").hidden = ed.mode !== "doc";
     $("edit-textpanel").hidden = ed.mode !== "text";
     const rib = $("tx-ribbon");
@@ -4920,6 +4948,32 @@ else if (typeof exports === 'object')
     $("rd-clear").disabled = !(ed.redactions || []).length;
   }
   $("rd-clear").addEventListener("click", () => { ed.redactions = []; drawLayer(); editUi(); });
+
+  // The ribbon can be tucked away to leave the page alone for reading. Clicking a tab opens
+  // it again, as in a word processor, and double-clicking the open tab closes it.
+  function setRibbonCollapsed(on, remember){
+    const rib = $("docribbon"), btn = $("rb-collapse");
+    if (!rib || !btn) return;
+    rib.classList.toggle("collapsed", on);
+    // Apply travels with the ribbon: down in the body when it is open, up beside the tabs
+    // when it is tucked away, so pending changes can always be applied
+    (on ? rib.querySelector(".rtabs") : $("rbody")).appendChild($("rapply"));
+    btn.setAttribute("aria-expanded", on ? "false" : "true");
+    btn.title = on ? "Show the ribbon" : "Hide the ribbon to read";
+    btn.setAttribute("aria-label", btn.title);
+    btn.innerHTML = on ? "&#8964;" : "&#8963;";
+    if (remember) { try { localStorage.setItem("pdf-tools:ribbon-collapsed", on ? "1" : "0"); } catch (e) {} }
+    if (ed.view) requestAnimationFrame(() => editRender());     // the page re-fits the space it now has
+  }
+  $("rb-collapse").addEventListener("click", () => setRibbonCollapsed(!$("docribbon").classList.contains("collapsed"), true));
+  document.querySelectorAll("#edit-modes .segbtn").forEach(b => {
+    b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
+    b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
+  });
+  // Reading comes first on a phone: the ribbon starts tucked away there unless it was left open
+  { let saved = null; try { saved = localStorage.getItem("pdf-tools:ribbon-collapsed"); } catch (e) {}
+    const narrow = window.matchMedia && window.matchMedia("(max-width: 760px)").matches;
+    if (saved === "1" || (saved === null && narrow)) setRibbonCollapsed(true, false); }
 
   // Delete the text a redaction covers, put back whatever part of a line survives outside
   // it, then paint the box. The order matters: the box is only ever a visual marker.
