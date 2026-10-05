@@ -1252,6 +1252,15 @@
   function hexRgb(h){ const n = parseInt(h.slice(1), 16); return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); }
   function todayText(){ const d = new Date(); return (d.getMonth() + 1) + "/" + d.getDate() + "/" + d.getFullYear(); }
 
+  // How far in from the left a line of a text box starts, for its alignment: the spare width inside
+  // the padding, times 0 (left), a half (centre) or all of it (right).
+  function boxAlignShift(o, line, docFont, font){
+    const f = o.align === "center" ? 0.5 : o.align === "right" ? 1 : 0;
+    if (!f) return 0;
+    let w;
+    try { w = docFont && docFont.usable ? widthWithDocFont(docFont, line, o.size) : (font || helv).widthOfTextAtSize(line, o.size); } catch (err) { w = helv.widthOfTextAtSize(line, o.size); }
+    return f * Math.max(0, o.w - 2 * TPAD - w);
+  }
   function layoutText(o){
     const size = o.size, lineH = size * LINE;
     const W = ed.dims[o.page].W;
@@ -1380,6 +1389,7 @@
           d.className = "tl";
           d.style.font = o.size * s + "px/" + o.size * LINE * s + "px \"Std Sans\", Arial, Helvetica, sans-serif";
           d.textContent = l || "\u200b";
+          d.style.textAlign = o.align || "left";
           el.appendChild(d);
         });
       } else if (o.type === "check" || o.type === "cross") {
@@ -1685,7 +1695,18 @@
       const v = document.createElement("span"); v.className = "muted"; v.textContent = o.size + " pt";
       r.addEventListener("input", () => { o.size = +r.value; v.textContent = o.size + " pt"; layoutText(o); clampObj(o); layoutText(o); drawLayer(); });
       size.append(sl, r, v);
-      box.append(ta, warn, fontRow, size, colorChips(o));
+      const alignRow = document.createElement("div"); alignRow.className = "proprow";
+      const al = document.createElement("span"); al.className = "muted"; al.textContent = "Align";
+      alignRow.appendChild(al);
+      [["left", "Align left", "M4 6h16M4 12h10M4 18h13"], ["center", "Align centre", "M4 6h16M7 12h10M5.5 18h13"], ["right", "Align right", "M4 6h16M10 12h10M7 18h13"]].forEach(([v, label, path]) => {
+        const bt = document.createElement("button");
+        bt.type = "button"; bt.className = "btn icon alignbtn" + ((o.align || "left") === v ? " armed" : ""); bt.dataset.align = v;
+        bt.setAttribute("aria-label", label); bt.setAttribute("aria-pressed", (o.align || "left") === v ? "true" : "false"); bt.title = label;
+        bt.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="' + path + '"/></svg>';
+        bt.addEventListener("click", () => { o.align = v; box.dataset.obj = ""; drawLayer(); editUi(); });
+        alignRow.appendChild(bt);
+      });
+      box.append(ta, warn, fontRow, size, alignRow, colorChips(o));
       warn.hidden = !cleanText(o.raw).bad;
     } else if (o.type === "check" || o.type === "cross" || o.type === "box") {
       box.appendChild(colorChips(o));
@@ -1698,7 +1719,7 @@
 
   function fieldPage(f){ return f.widgets.length ? f.widgets[0].page : -1; }
   async function selectField(i, fromTap){
-    ed.fsel = i;
+    ed.fsel = i; ed.fpanelClosed = false;
     const f = ed.fields[i];
     if (f && fieldPage(f) >= 0 && fieldPage(f) !== ed.page) { ed.page = fieldPage(f); ed.sel = null; await editRender(); }
     else { drawLayer(); editUi(); }
@@ -1709,7 +1730,7 @@
 
   function renderFieldPanel(){
     const panel = $("fpanel");
-    if (ed.mode !== "form" || !ed.fields.length) { panel.hidden = true; return; }
+    if (ed.mode !== "form" || !ed.fields.length || ed.fpanelClosed) { panel.hidden = true; return; }
     panel.hidden = false;
     const f = ed.fields[ed.fsel];
     $("f-prev").disabled = ed.fsel <= 0;
@@ -1803,8 +1824,8 @@
     // Text editing happens on the page and in the ribbon, so the side panel only opens for
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
-    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) || ed.mode === "form" ||
-                       textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
+    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) ||
+                       (ed.mode === "form" && !ed.fpanelClosed && ed.fields.length > 0) || textPanelNeeded;
     // contextual panels float over the page edge instead of taking a column, so the page
     // keeps its width whether or not one is showing
     $("workarea").classList.toggle("has-props", !!needsProps);
@@ -1846,7 +1867,7 @@
   function fillTextFonts(block){
     const sel = $("tx-font"), keep = sel.value;
     sel.innerHTML = "";
-    const info = ed.docFonts && block ? ed.docFonts.get(block.fontRes) : null;
+    const info = block ? docFontFor(block) : null;
     if (info && info.usable) {
       sel.appendChild(new Option("Match the document", "doc"));
       [["bold", "Match the document \u2014 Bold"], ["italic", "Match the document \u2014 Italic"],
@@ -1861,7 +1882,7 @@
     const b = ed.blocks[i];
     const cur = ed.textEdits.get(i) || { page: ed.page, stream: b.stream || null, ops: b.ops, text: b.text, fontName: StandardFonts.Helvetica,
       size: b.size, fill: b.fill, x: b.x, top: b.top, width: b.w, height: b.height, leading: b.leading,
-      lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0,
+      lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0, align: "left",
       box: { x: b.x, y: b.minY, w: b.w, h: (b.maxY - b.minY) + b.h } };
     ed.textEdits.set(i, Object.assign(cur, patch));
     return cur;
@@ -1951,6 +1972,17 @@
 
   // Load what the page's own fonts can do. Used by the text editor, and by a new text box
   // that wants to match the document rather than approximate it.
+  // The table of the page's own fonts is keyed by resource name when text mode builds it and
+  // by "resource|stream" when the font menu for added text does. Anything that looks a font up
+  // for a block must accept either, or the document's font quietly stops being offered.
+  function docFontFor(b){
+    if (!ed.docFonts || !b || !b.fontRes) return null;
+    return ed.docFonts.get(b.fontRes + "|" + (b.stream || "")) || ed.docFonts.get(b.fontRes) || null;
+  }
+  function docSiblingFor(b, want){
+    if (!ed.docSiblings || !b || !b.fontRes) return null;
+    return ed.docSiblings.get(b.fontRes + "|" + (b.stream || "") + ":" + want) || ed.docSiblings.get(b.fontRes + ":" + want) || null;
+  }
   async function ensureDocFonts(){
     if (ed.docFonts && ed.docFonts.size) return;
     ed.docFonts = new Map(); ed.docSiblings = new Map();
@@ -2008,11 +2040,15 @@
   // Text we cannot rewrite can still be removed: removal only needs to know which
   // operators draw it. The catch is that one operator may draw more than the line pointed
   // at, so the full extent is shown before anything is deleted.
+  // The instructions that draw a piece of text: the ones matched to it, or failing that the one
+  // found for it by its baseline. Empty when the text is not drawn by any (a scan, outlines).
+  const lockSpans = r => (r.spans && r.spans.length ? r.spans : r.rmSpans) || [];
   function selectLocked(run){
     ed.tsel = null;
     ed.lockedSel = run;
-    const share = (ed.runs || []).filter(o => o !== run && o.spans && run.spans &&
-      o.spans.some(s1 => run.spans.some(s2 => s1.opStart === s2.opStart)));
+    const mine = lockSpans(run);
+    const share = (ed.runs || []).filter(o => o !== run &&
+      lockSpans(o).some(s1 => mine.some(s2 => s1.opStart != null && s1.opStart === s2.opStart)));
     ed.lockedAlso = share;
     drawLayer(); editUi();
     setStatus(editStatus, "info", (LOCK_REASON[run.reason] || LOCK_REASON.unpositioned) +
@@ -2021,10 +2057,10 @@
   function deleteLocked(){
     const run = ed.lockedSel;
     if (!run) return;
-    const spans = run.spans && run.spans.length ? run.spans : [{ opStart: run.opStart, opEnd: run.opEnd }];
-    if (!spans.length || spans[0].opStart == null) { setStatus(editStatus, "error", "This text can't be removed either: it isn't drawn as text on this page."); return; }
+    const spans = lockSpans(run).length ? lockSpans(run) : (run.opStart != null ? [{ opStart: run.opStart, opEnd: run.opEnd }] : []);
+    if (!spans.length || spans[0].opStart == null) { setStatus(editStatus, "error", NO_REMOVE); return; }
     const key = "locked:" + spans[0].opStart;
-    ed.textEdits.set(key, { page: ed.page, stream: run.stream || null, ops: spans, text: "",
+    ed.textEdits.set(key, { page: ed.page, stream: run.stream || run.rmStream || null, ops: spans, text: "",
       fontName: "doc", docFontRes: run.fontRes, size: run.size, fill: run.fill,
       x: run.x, top: run.y + run.h, width: run.w, leading: run.size * LINE,
       lineBoxes: [{ x: run.x, y: run.y, w: run.w }], moved: false, dx: 0, dy: 0 });
@@ -2041,20 +2077,28 @@
     if (!sel) return;
     const b = ed.tsel !== null && ed.blocks ? ed.blocks[ed.tsel] : null;
     sel.disabled = size.disabled = !b;
-    if (!b) { note.textContent = "Select some text to change its font or size."; return; }
+    if (!b) {
+      document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => { btn.disabled = true; btn.setAttribute("aria-pressed", "false"); btn.classList.remove("armed"); });
+      note.textContent = ""; return;          // the status line below the page says how to start; a note here would make the ribbon taller
+    }
     const e = ed.textEdits.get(ed.tsel) || {};
     const want = e.fontName || fontDefaultFor(b);
-    const built = sel.dataset.forBlock === String(ed.tsel);
+    const offers = ed.tsel + ":" + (docFontFor(b) && docFontFor(b).usable ? 1 : 0) + ":" + ["bold", "italic", "bolditalic", "regular"].filter(w => docSiblingFor(b, w)).join(",");
+    const built = sel.dataset.forBlock === offers;
     if (!built) {
       sel.innerHTML = "";
-      const dinfo = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+      const dinfo = docFontFor(b);
       if (dinfo && dinfo.usable) sel.appendChild(new Option("Match the document", "doc"));
       [["doc:bold", "Document bold"], ["doc:italic", "Document italic"],
        ["doc:bolditalic", "Document bold italic"], ["doc:regular", "Document regular"]]
-        .forEach(([v, label]) => { if (ed.docSiblings && ed.docSiblings.get(b.fontRes + "|" + (b.stream || "") + ":" + v.slice(4))) sel.appendChild(new Option(label, v)); });
+        .forEach(([v, label]) => { if (docSiblingFor(b, v.slice(4))) sel.appendChild(new Option(label, v)); });
       TEXT_FONTS.forEach(([label, v]) => sel.appendChild(new Option(label, v)));
-      sel.dataset.forBlock = String(ed.tsel);
+      sel.dataset.forBlock = offers;
     }
+    document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => {
+      const on = (e.align || "left") === btn.dataset.align;
+      btn.disabled = false; btn.setAttribute("aria-pressed", on ? "true" : "false"); btn.classList.toggle("armed", on);
+    });
     sel.value = want;
     if (document.activeElement !== size) size.value = String(Math.round((e.size || b.size) * 10) / 10);
     const e2 = ed.textEdits.get(ed.tsel) || {};
@@ -2073,9 +2117,14 @@
     note.className = "ribbon-note" + (grew || (b.stream && ed.formPages && (ed.formPages.get(b.stream) || 1) > 1) ? " warn" : "");
   }
   function fontDefaultFor(b){
-    const dinfo = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+    const dinfo = docFontFor(b);
     return dinfo && dinfo.usable ? "doc" : StandardFonts.Helvetica;
   }
+  document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => btn.addEventListener("click", () => {
+    if (ed.tsel === null) return;
+    blockEdit(ed.tsel, { align: btn.dataset.align });
+    drawLayer(); editUi();
+  }));
   { const sel = $("rb-font"), size = $("rb-size");
     if (sel) sel.addEventListener("change", () => { if (ed.tsel !== null) { blockEdit(ed.tsel, { fontName: sel.value }); drawLayer(); editUi(); } });
     if (size) size.addEventListener("input", () => { if (ed.tsel !== null && +size.value > 0) { blockEdit(ed.tsel, { size: +size.value }); drawLayer(); editUi(); } }); }
@@ -2087,8 +2136,10 @@
     if (locked) {
       const n = (ed.lockedAlso || []).length;
       $("tx-locked-why").textContent = LOCK_REASON[ed.lockedSel.reason] || LOCK_REASON.unpositioned;
-      $("tx-locked-extent").textContent = n
-        ? "Removing it also removes " + plural(n, "other line") + " drawn by the same instruction \u2014 shown outlined on the page."
+      const removable = lockSpans(ed.lockedSel).length > 0 || ed.lockedSel.opStart != null;
+      $("tx-locked-go").disabled = !removable;
+      $("tx-locked-extent").textContent = !removable ? NO_REMOVE
+        : n ? "Removing it also removes " + plural(n, "other line") + " drawn by the same instruction \u2014 shown outlined on the page."
         : "Nothing else is drawn by the same instruction, so only this goes.";
     }
     $("tx-empty").hidden = !!has || locked;
@@ -2098,7 +2149,7 @@
     if (document.activeElement !== $("tx-text")) $("tx-text").value = e ? e.text : b.text;
     fillTextFonts(b);
     if (e) $("tx-font").value = e.fontName;
-    const dinfo = ed.docFonts && ed.docFonts.get(b.fontRes);
+    const dinfo = docFontFor(b);
     const usingDoc = $("tx-font").value.indexOf("doc") === 0;
     const missing = usingDoc && dinfo ? [...new Set(($("tx-text").value || "").replace(/\n/g, ""))]
       .filter(ch => ch.trim() && !activeDocFont(b).toCode.has(ch)) : [];
@@ -2162,7 +2213,7 @@
   }
   function activeDocFont(b){
     const v = $("tx-font").value;
-    if (v === "doc") return ed.docFonts.get(b.fontRes);
+    if (v === "doc") return docFontFor(b);
     if (v.indexOf("doc:") === 0) return ed.docSiblings.get(b.fontRes + ":" + v.slice(4));
     return null;
   }
@@ -2172,8 +2223,8 @@
     const b = ed.blocks[ed.tsel];
     const value = $("tx-text").value, font = $("tx-font").value, size = +$("tx-size").value || b.size;
     const e = ed.textEdits.get(ed.tsel);
-    const dflt = (ed.docFonts && ed.docFonts.get(b.fontRes) || {}).usable ? "doc" : StandardFonts.Helvetica;
-    const unchanged = value === b.text && font === dflt && Math.abs(size - b.size) < 0.05 && !(e && e.moved) && !(e && e.resized);
+    const dflt = (docFontFor(b) || {}).usable ? "doc" : StandardFonts.Helvetica;
+    const unchanged = value === b.text && font === dflt && Math.abs(size - b.size) < 0.05 && !(e && e.moved) && !(e && e.resized) && !(e && e.align && e.align !== "left");
     if (unchanged) ed.textEdits.delete(ed.tsel);
     else {
       const docFont = activeDocFont(b);
@@ -2272,7 +2323,7 @@
 
   document.querySelectorAll("#edit-modes .segbtn").forEach(b => b.addEventListener("click", () => {
     if (b.disabled) return;
-    ed.mode = b.dataset.emode; ed.tool = null; ed.sel = null;
+    ed.mode = b.dataset.emode; ed.tool = null; ed.sel = null; ed.fpanelClosed = false;
     if (ed.mode === "text") { enterTextMode(); return; }
     if (ed.mode === "redact") { enterRedactMode(); return; }
     drawLayer(); editUi();
@@ -2692,6 +2743,7 @@
           measure = (t, sz) => font.widthOfTextAtSize(t, sz);
         }
         const size = e.size || 11;
+        const alignF = e.align === "center" ? 0.5 : e.align === "right" ? 1 : 0;      // how far along the spare width a line starts
         const typed = body.split("\n");
         const [r, g, b] = e.fill || [0, 0, 0];
         const head = "\nq " + reset + "BT 0 Tc 0 Tw 100 Tz 0 Ts 0 Tr " + key.asString() + " " + size + " Tf " + r + " " + g + " " + b + " rg ";
@@ -2706,7 +2758,9 @@
         if (fits) {
           add += head;
           typed.forEach((ln, i) => {
-            const bx = boxes[i].x + (e.dx || 0), by = boxes[i].y + (e.dy || 0);
+            let bx = boxes[i].x + (e.dx || 0);
+            const by = boxes[i].y + (e.dy || 0);
+            if (alignF) bx = e.x + alignF * Math.max(0, maxW - measure(ln, size));     // aligned inside the block's width
             add += " 1 0 0 1 " + (Math.round(bx * 100) / 100) + " " + (Math.round(by * 100) / 100) + " Tm " +
                    encode(ln) + " Tj";
           });
@@ -2716,10 +2770,20 @@
           const wrapW = e.resized ? Math.max(size, e.width) : maxW;
           typed.forEach(t => wrapToWidth({ widthOfTextAtSize: measure }, t, size, wrapW).forEach(l => lines.push(l)));
           const leading = e.leading && e.leading > size * 0.8 ? e.leading : size * LINE;
-          add += head + leading + " TL 1 0 0 1 " + (Math.round(e.x * 100) / 100) + " " +
-                 (Math.round((e.top - size) * 100) / 100) + " Tm";
-          lines.forEach((ln, i) => { add += (i ? " T* " : " ") + encode(ln) + " Tj"; });
-          add += " ET Q";
+          if (alignF) {
+            // each line starts at its own x, so every line is placed rather than stepped down with T*
+            add += head;
+            lines.forEach((ln, i) => {
+              const lx = e.x + alignF * Math.max(0, wrapW - measure(ln, size)), ly = (e.top - size) - i * leading;
+              add += " 1 0 0 1 " + (Math.round(lx * 100) / 100) + " " + (Math.round(ly * 100) / 100) + " Tm " + encode(ln) + " Tj";
+            });
+            add += " ET Q";
+          } else {
+            add += head + leading + " TL 1 0 0 1 " + (Math.round(e.x * 100) / 100) + " " +
+                   (Math.round((e.top - size) * 100) / 100) + " Tm";
+            lines.forEach((ln, i) => { add += (i ? " T* " : " ") + encode(ln) + " Tj"; });
+            add += " ET Q";
+          }
         }
       }
       commit(out + add);
@@ -3048,9 +3112,22 @@
             if (gap > sz * 3 || gap < -1.5 * sz) return;
             if (share < 0 || o.matrix[4] > ops[share].matrix[4]) share = j;
           });
-          if (share < 0) return null;
-          const viaShare = [share]; viaShare.shared = true;      // matched as a continuation, not by its own position
-          return viaShare;
+          if (share >= 0) {
+            const viaShare = [share]; viaShare.shared = true;    // matched as a continuation, not by its own position
+            return viaShare;
+          }
+          // Pieces many ems apart (table cells, indented code) are not safe to rewrite, but the
+          // operator that draws them is still the nearest one on this baseline that starts at or
+          // before the piece, and that is all removal needs to know.
+          let near = -1;
+          reach.forEach((right, j) => {
+            const o = ops[j];
+            if (!o.located || Math.abs(o.matrix[5] - f) > 0.6 || e < o.matrix[4] - 0.6) return;
+            if (near < 0 || o.matrix[4] > ops[near].matrix[4]) near = j;
+          });
+          if (near < 0) return null;
+          const removalOnly = [near]; removalOnly.removalOnly = true;
+          return removalOnly;
         }
         start = any;
       }
@@ -3067,7 +3144,8 @@
       // the remainder of the line on the page under the replacement.
       const idxs = takeOps(e, f, Math.hypot(a, b) || Math.hypot(c, d));
       const k = idxs ? idxs[0] : -1;
-      const op = k < 0 ? null : ops[k];
+      const rmOp = idxs && idxs.removalOnly ? ops[k] : null;       // found for removal only, never for editing
+      const op = k < 0 || rmOp ? null : ops[k];
       const viaShare = !!(idxs && idxs.shared);
       if (op) reach.set(k, Math.max(reach.has(k) ? reach.get(k) : -1e9, e + Math.abs(it.width)));
       const spans = [];
@@ -3106,6 +3184,7 @@
       runs.push({
         str: it.str, x: e, y: f, w: it.width, h: it.height || shown,
         editable: !!op && trustworthy, primary: op ? op.start : null, viaShare,
+        rmSpans: rmOp ? [{ opStart: rmOp.start, opEnd: rmOp.end }] : null, rmStream: rmOp ? rmOp.stream || null : null,
         opStart: op ? op.start : null, opEnd: op ? op.end : null, spans,
         fontRes: op ? op.font : null, reason, stream: op ? op.stream || null : null,
         matrix: op ? op.matrix : null, fill: op ? op.fill : [0, 0, 0],
@@ -3296,7 +3375,7 @@
     const e0 = ed.textEdits.get(i) || {};
     const width = e0.width || b.w;
     const size = e0.size || b.size;
-    const info = ed.docFonts && ed.docFonts.get(b.fontRes + "|" + (b.stream || ""));
+    const info = docFontFor(b);
     const measure = (t, sz) => info && info.usable ? widthWithDocFont(info, t, sz) : t.length * sz * 0.5;
     const overflowing = lines.length > 1 && lines.some(l => measure(l.replace(/\s+$/, ""), size) > width * 1.02);
     let text = lines.join("\n");
@@ -3442,6 +3521,12 @@
       }
       el.style.left = p[0] + "px";
       el.style.top = p[1] + "px";
+      if (e.align === "center" || e.align === "right") {
+        // inside the block's own width: the box spans it and the browser places the line
+        el.style.left = vp.convertToViewportPoint(x, pl.y)[0] + "px";
+        el.style.width = Math.max(size, width) * s + "px";
+        el.style.textAlign = e.align;
+      }
       el.style.fontSize = (size * s) + "px";
       el.style.fontFamily = CSS_FONT[e.fontName] || CSS_FONT.Helvetica;
       const [r, g, bl] = e.fill || [0, 0, 0];
@@ -3450,6 +3535,7 @@
     });
   }
 
+  const NO_REMOVE = "This can't be removed either: it isn't drawn as text on this page (a scan, or letters turned into outlines). Use Redact to black it out instead.";
   const LOCK_REASON = {
     form: "This text is drawn inside a reusable block \u2014 a header, footer or letterhead that the page stamps in from elsewhere. Editing it would change every page that uses it, so it is left alone for now.",
     unpositioned: "This line's position isn't stated in the file; it continues from wherever the previous text ended, so its exact place can't be worked out reliably. Rewriting it could put the text in the wrong spot.",
@@ -3676,6 +3762,23 @@
     b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
     b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
   });
+  // ---------- Closing the floating panel ----------
+  // Whatever panel is showing goes away; nothing already done is undone by closing it.
+  function closeSidePanel(){
+    if (!$("sigbox").hidden) {
+      if (ed.pendingImage && ed.pendingImage.isSignature) { URL.revokeObjectURL(ed.pendingImage.url); ed.pendingImage = null; ed.tool = null; }
+      $("sigbox").hidden = true;
+    }
+    if (ed.lockedSel) { ed.lockedSel = null; ed.lockedAlso = []; }
+    if (ed.mode === "form") { ed.fpanelClosed = true; ed.fsel = -1; }
+    if (ed.sel !== null && narrowScreen()) ed.sel = null;           // the object's controls live here only on a phone
+    drawLayer(); editUi();
+  }
+  $("ctl-close").addEventListener("click", closeSidePanel);
+  document.querySelector(".ctlcol").addEventListener("keydown", ev => {
+    if (ev.key === "Escape" && !ev.target.closest("textarea")) { ev.preventDefault(); closeSidePanel(); }
+  });
+
   // ---------- Jump to a page ----------
   // Type a number and press Enter (or leave the box): out-of-range numbers are brought back into
   // range, and anything that is not a number puts the current page back.
@@ -4089,14 +4192,14 @@
               // text is written, so a new box matches the page instead of approximating it
               o.lines.forEach((line, i) => {
                 if (!line) return;
-                const p = pt(o.x + TPAD, o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
+                const p = pt(o.x + TPAD + boxAlignShift(o, line, o.docFont), o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
                 docText.push({ page: o.page, res: o.fontRes, stream: o.fontStream || null,
                                text: line, size: o.size, x: p.x, y: p.y, color: INKS_RGB[o.color] || [0, 0, 0] });
               });
             } else {
               o.lines.forEach((line, i) => {
                 if (!line) return;
-                const p = pt(o.x + TPAD, o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
+                const p = pt(o.x + TPAD + boxAlignShift(o, line, null, font), o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
                 lp.drawText(line, { x: p.x, y: p.y, size: o.size, font, color, rotate: rot });
               });
             }
