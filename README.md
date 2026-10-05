@@ -30,11 +30,14 @@ can't be edited safely is marked and says why when you tap it.
 
 Everything on the Document tab lives in a single ribbon, like a word processor's: **Add to page**,
 **Fill form**, **Edit text**, **Redact** and **Whole document** are its tabs, and each tab shows
-only its own controls. Page navigation, zoom and Apply sit beside the tabs. The page takes the
+only its own controls. Page navigation and zoom sit beside the tabs and Apply is at the right end of the ribbon. The page takes the
 full width; anything contextual (the signature builder, a selected object's properties, a form
 field) floats over its edge instead of taking a column. For reading, the arrow at the end of the
 tab row tucks the ribbon away (double-click the open tab does the same); picking a tab brings it
 back. On a phone it starts tucked away so the document comes first.
+
+Save and Undo are icons in the header, next to the file's name and what has changed (Ctrl+S
+downloads what is open), so no row of the page is spent on them.
 
 ### Finding your way around
 

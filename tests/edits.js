@@ -852,6 +852,18 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    const g2=await p.evaluate(()=>{const st=document.querySelector('.stagecol').getBoundingClientRect(), c=document.querySelector('.ctlcol').getBoundingClientRect(), mid=document.elementFromPoint(c.left+c.width/2,c.top+30); return {page:Math.round(st.width), floats:getComputedStyle(document.querySelector('.ctlcol')).position==='fixed', on_top:!!(mid&&mid.closest('.ctlcol'))};});
    check('ribbon: the signature panel floats over the page instead of narrowing it', g2.floats && g2.on_top && g2.page===g.page, JSON.stringify(g2));
    await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await sleep(300);
+   // the quick-access bar: save and undo as icons in the header, no banner row of its own
+   await p.evaluate(()=>window.scrollTo(0,0)); await sleep(200);
+   { const q=await p.evaluate(()=>{const h=document.querySelector('header.top').getBoundingClientRect(), r=document.getElementById('docribbon').getBoundingClientRect();
+       const dl=document.getElementById('docbar-dl'), un=document.getElementById('docbar-undo'), steps=+document.getElementById('docbar').dataset.steps;
+       return {inHeader:!!document.querySelector('header.top #docbar'), icons:!!dl.querySelector('svg')&&!!un.querySelector('svg')&&dl.textContent.trim()===''&&un.textContent.trim()==='',
+         labelled:!!dl.getAttribute('aria-label')&&!!un.getAttribute('aria-label'), gap:Math.round(r.top-h.bottom), undoOk:un.disabled===(steps===0), steps, sticky:getComputedStyle(document.querySelector('header.top')).position};});
+     check('header: save and undo are icon buttons in the header', q.inHeader && q.icons && q.labelled, JSON.stringify(q));
+     check('header: no banner row, so the ribbon sits right under the header', q.gap>=0 && q.gap<=24 && q.sticky==='sticky', JSON.stringify(q));
+     check('header: undo is only enabled when there is something to undo', q.undoOk, JSON.stringify(q));
+     await p.keyboard.down('Control'); await p.keyboard.press('s'); await p.keyboard.up('Control');
+     const dls=await H.takeDownloads(p,1).catch(()=>[]);
+     check('header: Ctrl+S downloads the document', dls.length===1 && dls[0].buf.slice(0,5).toString()==='%PDF-', dls.length+' download(s)'); }
    // collapsing for reading
    const h0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().height));
    await p.evaluate(()=>document.getElementById('rb-collapse').click()); await sleep(900);
