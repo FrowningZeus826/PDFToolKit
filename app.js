@@ -1698,7 +1698,7 @@
 
   function fieldPage(f){ return f.widgets.length ? f.widgets[0].page : -1; }
   async function selectField(i, fromTap){
-    ed.fsel = i;
+    ed.fsel = i; ed.fpanelClosed = false;
     const f = ed.fields[i];
     if (f && fieldPage(f) >= 0 && fieldPage(f) !== ed.page) { ed.page = fieldPage(f); ed.sel = null; await editRender(); }
     else { drawLayer(); editUi(); }
@@ -1709,7 +1709,7 @@
 
   function renderFieldPanel(){
     const panel = $("fpanel");
-    if (ed.mode !== "form" || !ed.fields.length) { panel.hidden = true; return; }
+    if (ed.mode !== "form" || !ed.fields.length || ed.fpanelClosed) { panel.hidden = true; return; }
     panel.hidden = false;
     const f = ed.fields[ed.fsel];
     $("f-prev").disabled = ed.fsel <= 0;
@@ -1803,8 +1803,8 @@
     // Text editing happens on the page and in the ribbon, so the side panel only opens for
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
-    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) || ed.mode === "form" ||
-                       textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
+    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) ||
+                       (ed.mode === "form" && !ed.fpanelClosed && ed.fields.length > 0) || textPanelNeeded;
     // contextual panels float over the page edge instead of taking a column, so the page
     // keeps its width whether or not one is showing
     $("workarea").classList.toggle("has-props", !!needsProps);
@@ -2290,7 +2290,7 @@
 
   document.querySelectorAll("#edit-modes .segbtn").forEach(b => b.addEventListener("click", () => {
     if (b.disabled) return;
-    ed.mode = b.dataset.emode; ed.tool = null; ed.sel = null;
+    ed.mode = b.dataset.emode; ed.tool = null; ed.sel = null; ed.fpanelClosed = false;
     if (ed.mode === "text") { enterTextMode(); return; }
     if (ed.mode === "redact") { enterRedactMode(); return; }
     drawLayer(); editUi();
@@ -3710,6 +3710,23 @@
     b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
     b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
   });
+  // ---------- Closing the floating panel ----------
+  // Whatever panel is showing goes away; nothing already done is undone by closing it.
+  function closeSidePanel(){
+    if (!$("sigbox").hidden) {
+      if (ed.pendingImage && ed.pendingImage.isSignature) { URL.revokeObjectURL(ed.pendingImage.url); ed.pendingImage = null; ed.tool = null; }
+      $("sigbox").hidden = true;
+    }
+    if (ed.lockedSel) { ed.lockedSel = null; ed.lockedAlso = []; }
+    if (ed.mode === "form") { ed.fpanelClosed = true; ed.fsel = -1; }
+    if (ed.sel !== null && narrowScreen()) ed.sel = null;           // the object's controls live here only on a phone
+    drawLayer(); editUi();
+  }
+  $("ctl-close").addEventListener("click", closeSidePanel);
+  document.querySelector(".ctlcol").addEventListener("keydown", ev => {
+    if (ev.key === "Escape" && !ev.target.closest("textarea")) { ev.preventDefault(); closeSidePanel(); }
+  });
+
   // ---------- Jump to a page ----------
   // Type a number and press Enter (or leave the box): out-of-range numbers are brought back into
   // range, and anything that is not a number puts the current page back.

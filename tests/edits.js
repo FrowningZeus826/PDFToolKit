@@ -253,6 +253,18 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      `${before} -> ${after}`); }
  await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000);
 
+ // ---- the form-field panel can be closed, and comes back when a field is tapped ----
+ { const fm=(await H.newPage(b,H.LOCAL,false)).p; await fm.setViewport({width:1280,height:900});
+   await upload(fm,'#edit-input',FX('form.pdf')); await fm.waitForFunction(()=>!document.querySelector('#edit-modes .segbtn[data-emode=form]').disabled,{timeout:30000}); await sleep(1200);
+   await fm.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=form]').click()); await sleep(800);
+   const vis=()=>fm.evaluate(()=>({panel:!document.getElementById('fpanel').hidden, side:document.getElementById('workarea').classList.contains('has-props')}));
+   const o1=await vis(); check('close button: the form panel is open in Fill form', o1.panel && o1.side, JSON.stringify(o1));
+   await fm.click('#ctl-close'); await sleep(500);
+   const o2=await vis(); check('close button: closing it hides the form panel', !o2.panel && !o2.side, JSON.stringify(o2));
+   await fm.evaluate(()=>document.querySelector('.ffield').dispatchEvent(new MouseEvent('click',{bubbles:true}))); await sleep(600);
+   const o3=await vis(); check('close button: tapping a field brings the panel back', o3.panel && o3.side, JSON.stringify(o3));
+   await fm.close(); }
+
  // ---- one operator reported as several pieces (Acrobat Distiller style), and text that stays locked ----
  await openText('split-ops.pdf');
  { const info=await p.evaluate(()=>({blocks:document.querySelectorAll('.trun.block').length, locked:document.querySelectorAll('.trun.locked').length}));
@@ -282,6 +294,9 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    await setAll(false);
    await p.evaluate(()=>{const e=document.querySelector('.trun.locked'); e.dispatchEvent(new MouseEvent('click',{bubbles:true}));}); await sleep(500);
    check('locked text: it can still be selected, and says why it cannot be rewritten', !(await p.$eval('#tx-locked',e=>e.hidden)) && (await txt(p,'#tx-locked-why')).length>20, await txt(p,'#tx-locked-why')); }
+   { await p.click('#ctl-close'); await sleep(400);
+     check('close button: the locked-text panel closes and the text is deselected', await p.$eval('#tx-locked',e=>e.hidden) && !(await p.$eval('#workarea',e=>e.classList.contains('has-props'))));
+     await p.evaluate(()=>{const e=document.querySelector('.trun.locked'); e.dispatchEvent(new MouseEvent('click',{bubbles:true}));}); await sleep(500); }
    // the piece was found by its baseline only (a far-apart cell inside one instruction): removal still works
    { check('locked text: Remove it is available and warns what goes with it', !(await p.$eval('#tx-locked-go',e=>e.disabled)) && /also removes 1 other line/.test(await txt(p,'#tx-locked-extent')), await txt(p,'#tx-locked-extent'));
      await p.click('#tx-locked-go'); await sleep(600);
@@ -889,6 +904,10 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    await p.evaluate(()=>document.getElementById('sig-tool').click()); await sleep(500);
    const g2=await p.evaluate(()=>{const st=document.querySelector('.stagecol').getBoundingClientRect(), c=document.querySelector('.ctlcol').getBoundingClientRect(), mid=document.elementFromPoint(c.left+c.width/2,c.top+30); return {page:Math.round(st.width), floats:getComputedStyle(document.querySelector('.ctlcol')).position==='fixed', on_top:!!(mid&&mid.closest('.ctlcol'))};});
    check('ribbon: the signature panel floats over the page instead of narrowing it', g2.floats && g2.on_top && g2.page===g.page, JSON.stringify(g2));
+   // the panel has a close button
+   { await p.click('#ctl-close'); await sleep(400);
+     const cl=await p.evaluate(()=>({sig:document.getElementById('sigbox').hidden, side:document.getElementById('workarea').classList.contains('has-props'), shown:getComputedStyle(document.querySelector('.ctlcol')).display!=='none'}));
+     check('close button: the signature panel closes and the panel goes away', cl.sig && !cl.side && !cl.shown, JSON.stringify(cl)); }
    await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await sleep(300);
    // the quick-access bar: save and undo as icons in the header, no banner row of its own
    await p.evaluate(()=>window.scrollTo(0,0)); await sleep(200);

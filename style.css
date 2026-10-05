@@ -281,7 +281,12 @@
     border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; }
   .docribbon.collapsed ~ .workarea .ctlcol { top: calc(var(--hdr, 47px) + 64px); }
   .workarea:not(.has-props) .ctlcol { display: none; }
-  .ctlcol .props:first-child { margin-top: 0; }
+  .ctlcol { padding-top: 34px; }
+  .ctl-close { position: absolute; top: 6px; right: 8px; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    border: none; border-radius: 4px; background: none; color: var(--ink-soft); font-size: 14px; line-height: 1; cursor: pointer; }
+  .ctl-close:hover { background: var(--canvas); color: var(--ink); }
+  .ctl-close:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .ctlcol .props:first-of-type { margin-top: 0; }
   /* find in the document: a small bar over the corner of the page area, so it adds no height */
   .stagecol { position: relative; }
   .findbar { position: absolute; top: 10px; right: 24px; z-index: 55; display: flex; align-items: center; gap: 6px;

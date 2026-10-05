@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-ERgU/fkbqM85nLQXzEJBPDIb5vtbqxQFYxviqVoOSME=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5iGA8C1xDr76+egltA1oyY8HdKAosyEjMm6vIpLMxsE=' 'sha256-1Fy38KKgPiQwLTmG3cs2CFxHdF0PCpq7kh3W4pmSMWw=' 'sha256-lWAaaTu7VOIVGQt9lTmLN5JfoSY11UcR1Kf59LAt7pQ=' 'sha256-UQ7UpsQKZbLF3/NcAxLH0wxa+X6GLNf0/xzrZ90KlTs=' 'sha256-dUYyiakPggqqSTkIwwPt217KMh+oxbdqttxp4mN6tWU=' 'sha256-OEOy76Z4D5mm2vsxDxn+D3YY72tjuM79ZlarLTuNgp4=' 'sha256-SKPujgCSTLjH8MwNCZsTGP6hIK9Ws+6Ps6cN0jEYBsI=' 'sha256-2RsuOAbPTHqVGdn9EnjEF8LggItmRzCE/guEPU1kkyU=' 'sha256-AzKlOzntvLfdwt0h1Xn1u8cLTyWd4vC5+aJF2n59HuM=' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; manifest-src 'self'; worker-src 'self'; connect-src 'self'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>PDF Tool Kit</title>
@@ -291,7 +291,12 @@
     border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; }
   .docribbon.collapsed ~ .workarea .ctlcol { top: calc(var(--hdr, 47px) + 64px); }
   .workarea:not(.has-props) .ctlcol { display: none; }
-  .ctlcol .props:first-child { margin-top: 0; }
+  .ctlcol { padding-top: 34px; }
+  .ctl-close { position: absolute; top: 6px; right: 8px; width: 26px; height: 26px; padding: 0; display: inline-flex; align-items: center; justify-content: center;
+    border: none; border-radius: 4px; background: none; color: var(--ink-soft); font-size: 14px; line-height: 1; cursor: pointer; }
+  .ctl-close:hover { background: var(--canvas); color: var(--ink); }
+  .ctl-close:focus-visible { outline: 2px solid var(--gold); outline-offset: 1px; }
+  .ctlcol .props:first-of-type { margin-top: 0; }
   /* find in the document: a small bar over the corner of the page area, so it adds no height */
   .stagecol { position: relative; }
   .findbar { position: absolute; top: 10px; right: 24px; z-index: 55; display: flex; align-items: center; gap: 6px;
@@ -764,6 +769,7 @@
             </div>
             </div>
             <div class="ctlcol">
+              <button class="ctl-close" id="ctl-close" type="button" aria-label="Close this panel" title="Close (Esc)">&#10005;</button>
 <div id="edit-textpanel" hidden>
             <div class="props">
               <div id="tx-locked" hidden>
@@ -3105,7 +3111,7 @@ else if (typeof exports === 'object')
 
   function fieldPage(f){ return f.widgets.length ? f.widgets[0].page : -1; }
   async function selectField(i, fromTap){
-    ed.fsel = i;
+    ed.fsel = i; ed.fpanelClosed = false;
     const f = ed.fields[i];
     if (f && fieldPage(f) >= 0 && fieldPage(f) !== ed.page) { ed.page = fieldPage(f); ed.sel = null; await editRender(); }
     else { drawLayer(); editUi(); }
@@ -3116,7 +3122,7 @@ else if (typeof exports === 'object')
 
   function renderFieldPanel(){
     const panel = $("fpanel");
-    if (ed.mode !== "form" || !ed.fields.length) { panel.hidden = true; return; }
+    if (ed.mode !== "form" || !ed.fields.length || ed.fpanelClosed) { panel.hidden = true; return; }
     panel.hidden = false;
     const f = ed.fields[ed.fsel];
     $("f-prev").disabled = ed.fsel <= 0;
@@ -3210,8 +3216,8 @@ else if (typeof exports === 'object')
     // Text editing happens on the page and in the ribbon, so the side panel only opens for
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
-    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) || ed.mode === "form" ||
-                       textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
+    const needsProps = (annot && ((narrowScreen() && ed.sel !== null) || !$("sigbox").hidden)) ||
+                       (ed.mode === "form" && !ed.fpanelClosed && ed.fields.length > 0) || textPanelNeeded;
     // contextual panels float over the page edge instead of taking a column, so the page
     // keeps its width whether or not one is showing
     $("workarea").classList.toggle("has-props", !!needsProps);
@@ -3697,7 +3703,7 @@ else if (typeof exports === 'object')
 
   document.querySelectorAll("#edit-modes .segbtn").forEach(b => b.addEventListener("click", () => {
     if (b.disabled) return;
-    ed.mode = b.dataset.emode; ed.tool = null; ed.sel = null;
+    ed.mode = b.dataset.emode; ed.tool = null; ed.sel = null; ed.fpanelClosed = false;
     if (ed.mode === "text") { enterTextMode(); return; }
     if (ed.mode === "redact") { enterRedactMode(); return; }
     drawLayer(); editUi();
@@ -5117,6 +5123,23 @@ else if (typeof exports === 'object')
     b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
     b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
   });
+  // ---------- Closing the floating panel ----------
+  // Whatever panel is showing goes away; nothing already done is undone by closing it.
+  function closeSidePanel(){
+    if (!$("sigbox").hidden) {
+      if (ed.pendingImage && ed.pendingImage.isSignature) { URL.revokeObjectURL(ed.pendingImage.url); ed.pendingImage = null; ed.tool = null; }
+      $("sigbox").hidden = true;
+    }
+    if (ed.lockedSel) { ed.lockedSel = null; ed.lockedAlso = []; }
+    if (ed.mode === "form") { ed.fpanelClosed = true; ed.fsel = -1; }
+    if (ed.sel !== null && narrowScreen()) ed.sel = null;           // the object's controls live here only on a phone
+    drawLayer(); editUi();
+  }
+  $("ctl-close").addEventListener("click", closeSidePanel);
+  document.querySelector(".ctlcol").addEventListener("keydown", ev => {
+    if (ev.key === "Escape" && !ev.target.closest("textarea")) { ev.preventDefault(); closeSidePanel(); }
+  });
+
   // ---------- Jump to a page ----------
   // Type a number and press Enter (or leave the box): out-of-range numbers are brought back into
   // range, and anything that is not a number puts the current page back.

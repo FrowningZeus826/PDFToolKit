@@ -1,7 +1,7 @@
 // Service worker for the installed app: caches this one page so it keeps working
 // with no network. It never requests anything from another origin, and there is
 // nothing else to cache - the page carries its own libraries, fonts and OCR engine.
-const CACHE = 'pdf-tool-kit-08760f08e874';
+const CACHE = 'pdf-tool-kit-061290a46f3a';
 const PAGE = './';
 
 self.addEventListener('install', e => {
