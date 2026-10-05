@@ -535,7 +535,7 @@
   /* ---------- Pages, Prepare and Finish share the Document ribbon's look ---------- */
   .panel-body.docbody > .docribbon + .sheet { margin-top: 0; }
   .rdesc { font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
-  .rbody .rpane { min-height: 0; }
+  #panel-pages .rbody .rpane, #panel-prepare .rbody .rpane, #panel-finish .rbody .rpane { min-height: 0; }
   .sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px 18px; }
   #panel-prepare .sheet > *, #panel-finish .sheet > * { max-width: 760px; }
   #panel-prepare .sheet > .status, #panel-finish .sheet > .status { max-width: 760px; }
