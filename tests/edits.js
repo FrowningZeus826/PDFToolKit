@@ -491,6 +491,11 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    check('redact: dragging marks an area and counts what it will remove',
      /1 area on this page/.test(await txt(p,'#rd-count')) && /lines? of text will be deleted/.test(await txt(p,'#rd-count')), await txt(p,'#rd-count'));
    check('redact: the marked area is shown on the page', (await p.$$('.redbox')).length===1);
+   { const ids=await p.evaluate(()=>[...document.querySelectorAll('#rd-ribbon button, #rd-ribbon select')].map(e=>e.id));
+     check('redact: the controls sit in a ribbon above the page', ['rd-mark','rd-clear'].every(id=>ids.includes(id)) && !(await p.$eval('#rd-ribbon',e=>e.hidden)), ids.join(','));
+     const geo=await p.evaluate(()=>{const r=document.getElementById('rd-ribbon').getBoundingClientRect(), st=document.getElementById('estage').getBoundingClientRect(); return {above:r.bottom<=st.top+1, wa:document.getElementById('workarea').classList.contains('has-props')};});
+     check('redact: the ribbon is above the page and no side panel opens', geo.above && !geo.wa, JSON.stringify(geo));
+     check('redact: the text ribbon is not shown at the same time', await p.$eval('#tx-ribbon',e=>e.hidden)); }
    check('redact: how the area is finished can be chosen', (await p.$$eval('#rd-mark option',os=>os.map(o=>o.value))).join(',')==='black,white,none');
    await H.applyAndDownload(p,'#edit-go'); d=await H.takeDownloads(p,1); fs.writeFileSync('redacted.pdf',d[0].buf);
    execSync('pdftotext fx/quote.pdf /tmp/red-b.txt 2>/dev/null; pdftotext redacted.pdf /tmp/red-a.txt 2>/dev/null');

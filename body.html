@@ -132,18 +132,44 @@
           </div>
           <div class="stagecol">
           <div class="ribbon" id="tx-ribbon" hidden>
-<div class="pagesbar">
-                  <label class="groupctl" for="tx-group">Grouping
-                    <input type="range" id="tx-group" min="0" max="3" step="1" value="1" aria-label="How willingly text is grouped into paragraphs">
-                    <span id="tx-group-name" class="muted">Normal</span></label>
-                  <button class="btn" id="tx-showall" aria-pressed="false" title="Outline every editable block, instead of only the one under the pointer">Show all blocks</button>
-                  <button class="btn" id="tx-merge" title="Join this block with another one you pick">Merge with…</button>
-                  <button class="btn" id="tx-split" title="Split this block where you click on the page">Split…</button>
-                </div>
+            <div class="ribbon-group" role="group" aria-label="Grouping">
+              <span class="ribbon-title">Grouping</span>
+              <label class="groupctl" for="tx-group">
+                <input type="range" id="tx-group" min="0" max="3" step="1" value="1" aria-label="How willingly text is grouped into paragraphs">
+                <span id="tx-group-name" class="muted">Normal</span></label>
+              <button class="btn" id="tx-showall" aria-pressed="false" title="Outline every editable block, instead of only the one under the pointer">Show all blocks</button>
+            </div>
             <span class="ribbon-sep"></span>
-            <label class="ribbon-field" for="rb-font">Font <select id="rb-font" aria-label="Font"></select></label>
-            <label class="ribbon-field" for="rb-size">Size <input type="number" id="rb-size" min="4" max="96" step="0.5" aria-label="Text size"></label>
+            <div class="ribbon-group" role="group" aria-label="Blocks">
+              <span class="ribbon-title">Blocks</span>
+              <button class="btn" id="tx-merge" title="Join this block with another one you pick">Merge with&hellip;</button>
+              <button class="btn" id="tx-split" title="Split this block where you click on the page">Split&hellip;</button>
+            </div>
+            <span class="ribbon-sep"></span>
+            <div class="ribbon-group" role="group" aria-label="Text">
+              <span class="ribbon-title">Text</span>
+              <label class="ribbon-field" for="rb-font">Font <select id="rb-font" aria-label="Font"></select></label>
+              <label class="ribbon-field" for="rb-size">Size <input type="number" id="rb-size" min="4" max="96" step="0.5" aria-label="Text size"></label>
+            </div>
             <span class="ribbon-note" id="rb-note"></span>
+          </div>
+          <div class="ribbon" id="rd-ribbon" hidden>
+            <div class="ribbon-group" role="group" aria-label="Redaction">
+              <span class="ribbon-title">Redact</span>
+              <label class="ribbon-field" for="rd-mark">Leave the area
+                <select id="rd-mark" aria-label="What the area looks like once applied">
+                  <option value="black">Blacked out</option>
+                  <option value="white">Blank</option>
+                  <option value="none">As it was, text removed</option>
+                </select></label>
+              <button class="btn" id="rd-clear" title="Remove every marked area">Clear all</button>
+            </div>
+            <span class="ribbon-sep"></span>
+            <div class="ribbon-group ribbon-status" role="status">
+              <span id="rd-count"></span>
+              <span class="muted" id="rd-total"></span>
+            </div>
+            <span class="ribbon-note" id="rd-note">Drag a box over anything that must go. The text underneath is <b>deleted from the file</b>, not covered, so it can&rsquo;t be copied back out. Pictures and scanned pages are not touched &mdash; black those out or flatten the page yourself, and check the result before sharing.</span>
           </div>
             <div class="viewer-bar">
               <div class="grp nav">
@@ -190,22 +216,7 @@
               </div>
             </div>
           </div>
-<div id="edit-redactpanel" hidden>
-            <div class="props">
-              <div class="prophead"><b>Redact</b><button class="btn" id="rd-clear">Clear all</button></div>
-              <div class="hint">Drag a box over anything that must be removed &mdash; names, ID numbers, addresses. The text underneath is <b>deleted from the file</b>, not covered over, so it can't be copied back out.</div>
-              <label class="field-label" for="rd-mark">When applied, the area should be</label>
-              <select id="rd-mark">
-                <option value="black">Blacked out (the usual redaction mark)</option>
-                <option value="white">Left blank</option>
-                <option value="none">Left as it is, with only the text removed</option>
-              </select>
-              <div class="hint" id="rd-count"></div>
-              <div class="hint muted" id="rd-total"></div>
-              <div class="warnline">Check the result before sharing. Anything drawn as part of a picture, and any scanned page, must be handled by flattening or blacking out the image itself &mdash; this removes text.</div>
-            </div>
-          </div>
-          <div id="sigbox" hidden>        <div class="sigbox">
+<div id="sigbox" hidden>        <div class="sigbox">
           <div class="sighead">Your signature</div>
 
           <div class="sigrow" id="sig-saved" hidden>

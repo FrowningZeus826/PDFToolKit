@@ -1764,7 +1764,7 @@
     // the one case that needs it: removing text that cannot be rewritten.
     const textPanelNeeded = ed.mode === "text" && !!ed.lockedSel;
     const needsProps = (annot && (ed.sel !== null || !$("sigbox").hidden)) || ed.mode === "form" ||
-                       textPanelNeeded || ed.mode === "redact" || ($("f-flatten").checked && ed.fields.length);
+                       textPanelNeeded || ($("f-flatten").checked && ed.fields.length);
     const wa = $("workarea"), had = wa.classList.contains("has-props");
     wa.classList.toggle("has-props", !!needsProps);
     // the page column changes width when that column appears, so re-fit the page
@@ -1773,7 +1773,8 @@
     $("edit-textpanel").hidden = ed.mode !== "text";
     const rib = $("tx-ribbon");
     if (rib) { rib.hidden = ed.mode !== "text" || !ed.view; renderRibbon(); }
-    $("edit-redactpanel").hidden = ed.mode !== "redact";
+    const rdRib = $("rd-ribbon");
+    if (rdRib) rdRib.hidden = ed.mode !== "redact" || !ed.view;
     $("edit-hint").hidden = !annot;
     $("edit-hint").textContent = ed.tool ? TOOL_HINTS[ed.tool] : (ed.sel !== null ? "Drag to move. Drag the gold corner to resize." : "Pick a tool, then tap the page. Tap anything you've added to move, resize, or change it.");
     $("edit-hint").classList.toggle("warnline", ed.tool === "white");
