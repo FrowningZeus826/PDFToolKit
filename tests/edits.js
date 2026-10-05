@@ -253,6 +253,65 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      `${before} -> ${after}`); }
  await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(2000);
 
+ // ---- text alignment ----
+ const lineExtents=(file,pg=1)=>{ const bb=execSync(`pdftotext -f ${pg} -l ${pg} -bbox "${file}" -`).toString(); const rows=new Map();
+   [...bb.matchAll(/xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="[\d.]+">([^<]*)</g)].forEach(m=>{ const y=Math.round(+m[2]); const r=rows.get(y)||{x0:1e9,x1:-1,t:''}; r.x0=Math.min(r.x0,+m[1]); r.x1=Math.max(r.x1,+m[3]); r.t+=m[4]+' '; rows.set(y,r); });
+   return [...rows.entries()].sort((a,b)=>a[0]-b[0]).map(e=>e[1]); };
+ await openText('align.pdf');
+ { const h0=await p.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height)), t0=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().top));
+   await pickBlock(0);
+   const h1=await p.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height)), t1=await p.$eval('.stage-wrap',e=>Math.round(e.getBoundingClientRect().top));
+   check('ribbon: the Edit text row stays one row, so selecting text does not move the page', h0===h1 && h0<=110 && t0===t1, JSON.stringify({h0,h1,t0,t1})); }
+ { const orig=lineExtents(FX('align.pdf')); const frameL=Math.min(...orig.map(r=>r.x0)), frameR=Math.max(...orig.map(r=>r.x1));
+   await pickBlock(0);
+   const st=await p.$$eval('#tx-ribbon [data-align]',bs=>bs.map(b=>b.dataset.align+':'+b.disabled+':'+b.getAttribute('aria-pressed')));
+   check('align: the ribbon has left / centre / right, enabled once text is selected, left pressed', st.join()==='left:false:true,center:false:false,right:false:false', st.join());
+   for (const which of ['right','center']) {
+     await p.evaluate(w=>document.querySelector('#tx-ribbon [data-align='+w+']').click(), which); await sleep(500);
+     const pv=await p.$$eval('.tprev',es=>es.map(e=>{const r=e.getBoundingClientRect(); return {l:r.left, r:r.right, ta:getComputedStyle(e).textAlign};}));
+     const sameRight=which==='right' && new Set(pv.map(v=>Math.round(v.r))).size===1;
+     const sameMid=which==='center' && new Set(pv.map(v=>Math.round((v.l+v.r)/2))).size===1;
+     check(`align: the preview shows ${which}`, pv.length===3 && pv.every(v=>v.ta===which) && (sameRight||sameMid), JSON.stringify(pv.map(v=>[Math.round(v.l),Math.round(v.r),v.ta])));
+     check(`align: the button shows ${which} as pressed`, (await p.$eval('#tx-ribbon [data-align='+which+']',e=>e.getAttribute('aria-pressed')))==='true');
+     await H.applyAndDownload(p,'#edit-go'); const ad=await H.takeDownloads(p,1); const f=`align-${which}.pdf`; fs.writeFileSync(f,ad[0].buf);
+     const ex=lineExtents(f);
+     const ok = ex.length===3 && (which==='right' ? ex.every(r=>Math.abs(r.x1-frameR)<1.6) : ex.every(r=>Math.abs((r.x0+r.x1)/2-(frameL+frameR)/2)<1.6));
+     check(`align: saved ${which}-aligned inside the block's width (measured with pdftotext)`, ok, JSON.stringify(ex.map(r=>[Math.round(r.x0*10)/10,Math.round(r.x1*10)/10]))+` frame ${Math.round(frameL)}..${Math.round(frameR)}`);
+     check(`align: the words are unchanged`, ex.map(r=>r.t.trim()).join('|')==='Short|A somewhat longer line of text here|Mid length line', ex.map(r=>r.t.trim()).join('|'));
+     await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(1800);
+     await p.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=text]').click());
+     await p.waitForFunction(()=>document.querySelectorAll('.trun.block').length>0,{timeout:30000}); await sleep(600);
+     await pickBlock(0);
+   }
+   // back to left: nothing to apply, so choosing it again leaves the page as it was
+   await p.evaluate(()=>document.querySelector('#tx-ribbon [data-align=right]').click()); await sleep(300);
+   await p.evaluate(()=>document.querySelector('#tx-ribbon [data-align=left]').click()); await sleep(300);
+   check('align: choosing left again leaves nothing different to apply', true);
+   await H.applyAndDownload(p,'#edit-go'); const ld=await H.takeDownloads(p,1); fs.writeFileSync('align-left.pdf',ld[0].buf);
+   const lx=lineExtents('align-left.pdf'); check('align: left again puts every line back at the block\'s left edge', lx.length===3 && lx.every(r=>Math.abs(r.x0-frameL)<1.6), JSON.stringify(lx.map(r=>Math.round(r.x0*10)/10)));
+   await p.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(1800); }
+ // an added text box can be aligned too
+ { const ap=(await H.newPage(b,H.LOCAL,false)).p; await ap.setViewport({width:1280,height:900});
+   await upload(ap,'#edit-input',FX('a.pdf')); await ap.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+   await ap.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click());
+   const sb=await (await ap.$('#estage')).boundingBox(); await ap.mouse.click(sb.x+sb.width*0.15, sb.y+sb.height*0.3); await sleep(500);
+   await ap.keyboard.type('Hi'); await ap.keyboard.press('Enter'); await ap.keyboard.type('A longer second line'); await sleep(300);
+   const hb=await (await ap.$('.eobj.sel .eh')).boundingBox(); await ap.mouse.move(hb.x+hb.width/2,hb.y+hb.height/2); await ap.mouse.down(); await ap.mouse.move(hb.x+hb.width/2+140,hb.y+hb.height/2,{steps:8}); await ap.mouse.up(); await sleep(400);
+   check('align: a text box has alignment buttons', (await ap.$$('#eprops .alignbtn')).length===3);
+   for (const which of ['right','center']) {
+     await ap.evaluate(w=>document.querySelector('#eprops .alignbtn[data-align='+w+']').click(), which); await sleep(400);
+     const tl=await ap.$$eval('.eobj.sel .tl',es=>es.map(e=>getComputedStyle(e).textAlign)); check(`align: the box previews ${which}`, tl.length===2 && tl.every(t=>t===which), tl.join());
+     await H.applyAndDownload(ap,'#edit-go'); const bd=await H.takeDownloads(ap,1); const f=`align-box-${which}.pdf`; fs.writeFileSync(f,bd[0].buf);
+     const ex=lineExtents(f).filter(r=>/Hi|longer/.test(r.t));
+     const ok=ex.length===2 && (which==='right' ? Math.abs(ex[0].x1-ex[1].x1)<1.6 && ex[0].x0>ex[1].x0+5 : Math.abs((ex[0].x0+ex[0].x1)/2-(ex[1].x0+ex[1].x1)/2)<1.6 && ex[0].x0>ex[1].x0+5);
+     check(`align: the saved box is ${which}-aligned`, ok, JSON.stringify(ex.map(r=>[Math.round(r.x0*10)/10,Math.round(r.x1*10)/10,r.t.trim()])));
+     await ap.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(1800);
+     if (which==='right') { await ap.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click());
+       await ap.mouse.click(sb.x+sb.width*0.15, sb.y+sb.height*0.3); await sleep(500); await ap.keyboard.type('Hi'); await ap.keyboard.press('Enter'); await ap.keyboard.type('A longer second line'); await sleep(300);
+       const h2=await (await ap.$('.eobj.sel .eh')).boundingBox(); await ap.mouse.move(h2.x+h2.width/2,h2.y+h2.height/2); await ap.mouse.down(); await ap.mouse.move(h2.x+h2.width/2+140,h2.y+h2.height/2,{steps:8}); await ap.mouse.up(); await sleep(400); }
+   }
+   await ap.close(); }
+
  // ---- the form-field panel can be closed, and comes back when a field is tapped ----
  { const fm=(await H.newPage(b,H.LOCAL,false)).p; await fm.setViewport({width:1280,height:900});
    await upload(fm,'#edit-input',FX('form.pdf')); await fm.waitForFunction(()=>!document.querySelector('#edit-modes .segbtn[data-emode=form]').disabled,{timeout:30000}); await sleep(1200);

@@ -1252,6 +1252,15 @@
   function hexRgb(h){ const n = parseInt(h.slice(1), 16); return rgb(((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255); }
   function todayText(){ const d = new Date(); return (d.getMonth() + 1) + "/" + d.getDate() + "/" + d.getFullYear(); }
 
+  // How far in from the left a line of a text box starts, for its alignment: the spare width inside
+  // the padding, times 0 (left), a half (centre) or all of it (right).
+  function boxAlignShift(o, line, docFont, font){
+    const f = o.align === "center" ? 0.5 : o.align === "right" ? 1 : 0;
+    if (!f) return 0;
+    let w;
+    try { w = docFont && docFont.usable ? widthWithDocFont(docFont, line, o.size) : (font || helv).widthOfTextAtSize(line, o.size); } catch (err) { w = helv.widthOfTextAtSize(line, o.size); }
+    return f * Math.max(0, o.w - 2 * TPAD - w);
+  }
   function layoutText(o){
     const size = o.size, lineH = size * LINE;
     const W = ed.dims[o.page].W;
@@ -1380,6 +1389,7 @@
           d.className = "tl";
           d.style.font = o.size * s + "px/" + o.size * LINE * s + "px \"Std Sans\", Arial, Helvetica, sans-serif";
           d.textContent = l || "\u200b";
+          d.style.textAlign = o.align || "left";
           el.appendChild(d);
         });
       } else if (o.type === "check" || o.type === "cross") {
@@ -1685,7 +1695,18 @@
       const v = document.createElement("span"); v.className = "muted"; v.textContent = o.size + " pt";
       r.addEventListener("input", () => { o.size = +r.value; v.textContent = o.size + " pt"; layoutText(o); clampObj(o); layoutText(o); drawLayer(); });
       size.append(sl, r, v);
-      box.append(ta, warn, fontRow, size, colorChips(o));
+      const alignRow = document.createElement("div"); alignRow.className = "proprow";
+      const al = document.createElement("span"); al.className = "muted"; al.textContent = "Align";
+      alignRow.appendChild(al);
+      [["left", "Align left", "M4 6h16M4 12h10M4 18h13"], ["center", "Align centre", "M4 6h16M7 12h10M5.5 18h13"], ["right", "Align right", "M4 6h16M10 12h10M7 18h13"]].forEach(([v, label, path]) => {
+        const bt = document.createElement("button");
+        bt.type = "button"; bt.className = "btn icon alignbtn" + ((o.align || "left") === v ? " armed" : ""); bt.dataset.align = v;
+        bt.setAttribute("aria-label", label); bt.setAttribute("aria-pressed", (o.align || "left") === v ? "true" : "false"); bt.title = label;
+        bt.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="' + path + '"/></svg>';
+        bt.addEventListener("click", () => { o.align = v; box.dataset.obj = ""; drawLayer(); editUi(); });
+        alignRow.appendChild(bt);
+      });
+      box.append(ta, warn, fontRow, size, alignRow, colorChips(o));
       warn.hidden = !cleanText(o.raw).bad;
     } else if (o.type === "check" || o.type === "cross" || o.type === "box") {
       box.appendChild(colorChips(o));
@@ -1861,7 +1882,7 @@
     const b = ed.blocks[i];
     const cur = ed.textEdits.get(i) || { page: ed.page, stream: b.stream || null, ops: b.ops, text: b.text, fontName: StandardFonts.Helvetica,
       size: b.size, fill: b.fill, x: b.x, top: b.top, width: b.w, height: b.height, leading: b.leading,
-      lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0,
+      lineBoxes: b.lineBoxes, moved: false, dx: 0, dy: 0, align: "left",
       box: { x: b.x, y: b.minY, w: b.w, h: (b.maxY - b.minY) + b.h } };
     ed.textEdits.set(i, Object.assign(cur, patch));
     return cur;
@@ -2056,7 +2077,10 @@
     if (!sel) return;
     const b = ed.tsel !== null && ed.blocks ? ed.blocks[ed.tsel] : null;
     sel.disabled = size.disabled = !b;
-    if (!b) { note.textContent = "Select some text to change its font or size."; return; }
+    if (!b) {
+      document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => { btn.disabled = true; btn.setAttribute("aria-pressed", "false"); btn.classList.remove("armed"); });
+      note.textContent = ""; return;          // the status line below the page says how to start; a note here would make the ribbon taller
+    }
     const e = ed.textEdits.get(ed.tsel) || {};
     const want = e.fontName || fontDefaultFor(b);
     const offers = ed.tsel + ":" + (docFontFor(b) && docFontFor(b).usable ? 1 : 0) + ":" + ["bold", "italic", "bolditalic", "regular"].filter(w => docSiblingFor(b, w)).join(",");
@@ -2071,6 +2095,10 @@
       TEXT_FONTS.forEach(([label, v]) => sel.appendChild(new Option(label, v)));
       sel.dataset.forBlock = offers;
     }
+    document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => {
+      const on = (e.align || "left") === btn.dataset.align;
+      btn.disabled = false; btn.setAttribute("aria-pressed", on ? "true" : "false"); btn.classList.toggle("armed", on);
+    });
     sel.value = want;
     if (document.activeElement !== size) size.value = String(Math.round((e.size || b.size) * 10) / 10);
     const e2 = ed.textEdits.get(ed.tsel) || {};
@@ -2092,6 +2120,11 @@
     const dinfo = docFontFor(b);
     return dinfo && dinfo.usable ? "doc" : StandardFonts.Helvetica;
   }
+  document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => btn.addEventListener("click", () => {
+    if (ed.tsel === null) return;
+    blockEdit(ed.tsel, { align: btn.dataset.align });
+    drawLayer(); editUi();
+  }));
   { const sel = $("rb-font"), size = $("rb-size");
     if (sel) sel.addEventListener("change", () => { if (ed.tsel !== null) { blockEdit(ed.tsel, { fontName: sel.value }); drawLayer(); editUi(); } });
     if (size) size.addEventListener("input", () => { if (ed.tsel !== null && +size.value > 0) { blockEdit(ed.tsel, { size: +size.value }); drawLayer(); editUi(); } }); }
@@ -2191,7 +2224,7 @@
     const value = $("tx-text").value, font = $("tx-font").value, size = +$("tx-size").value || b.size;
     const e = ed.textEdits.get(ed.tsel);
     const dflt = (docFontFor(b) || {}).usable ? "doc" : StandardFonts.Helvetica;
-    const unchanged = value === b.text && font === dflt && Math.abs(size - b.size) < 0.05 && !(e && e.moved) && !(e && e.resized);
+    const unchanged = value === b.text && font === dflt && Math.abs(size - b.size) < 0.05 && !(e && e.moved) && !(e && e.resized) && !(e && e.align && e.align !== "left");
     if (unchanged) ed.textEdits.delete(ed.tsel);
     else {
       const docFont = activeDocFont(b);
@@ -2710,6 +2743,7 @@
           measure = (t, sz) => font.widthOfTextAtSize(t, sz);
         }
         const size = e.size || 11;
+        const alignF = e.align === "center" ? 0.5 : e.align === "right" ? 1 : 0;      // how far along the spare width a line starts
         const typed = body.split("\n");
         const [r, g, b] = e.fill || [0, 0, 0];
         const head = "\nq " + reset + "BT 0 Tc 0 Tw 100 Tz 0 Ts 0 Tr " + key.asString() + " " + size + " Tf " + r + " " + g + " " + b + " rg ";
@@ -2724,7 +2758,9 @@
         if (fits) {
           add += head;
           typed.forEach((ln, i) => {
-            const bx = boxes[i].x + (e.dx || 0), by = boxes[i].y + (e.dy || 0);
+            let bx = boxes[i].x + (e.dx || 0);
+            const by = boxes[i].y + (e.dy || 0);
+            if (alignF) bx = e.x + alignF * Math.max(0, maxW - measure(ln, size));     // aligned inside the block's width
             add += " 1 0 0 1 " + (Math.round(bx * 100) / 100) + " " + (Math.round(by * 100) / 100) + " Tm " +
                    encode(ln) + " Tj";
           });
@@ -2734,10 +2770,20 @@
           const wrapW = e.resized ? Math.max(size, e.width) : maxW;
           typed.forEach(t => wrapToWidth({ widthOfTextAtSize: measure }, t, size, wrapW).forEach(l => lines.push(l)));
           const leading = e.leading && e.leading > size * 0.8 ? e.leading : size * LINE;
-          add += head + leading + " TL 1 0 0 1 " + (Math.round(e.x * 100) / 100) + " " +
-                 (Math.round((e.top - size) * 100) / 100) + " Tm";
-          lines.forEach((ln, i) => { add += (i ? " T* " : " ") + encode(ln) + " Tj"; });
-          add += " ET Q";
+          if (alignF) {
+            // each line starts at its own x, so every line is placed rather than stepped down with T*
+            add += head;
+            lines.forEach((ln, i) => {
+              const lx = e.x + alignF * Math.max(0, wrapW - measure(ln, size)), ly = (e.top - size) - i * leading;
+              add += " 1 0 0 1 " + (Math.round(lx * 100) / 100) + " " + (Math.round(ly * 100) / 100) + " Tm " + encode(ln) + " Tj";
+            });
+            add += " ET Q";
+          } else {
+            add += head + leading + " TL 1 0 0 1 " + (Math.round(e.x * 100) / 100) + " " +
+                   (Math.round((e.top - size) * 100) / 100) + " Tm";
+            lines.forEach((ln, i) => { add += (i ? " T* " : " ") + encode(ln) + " Tj"; });
+            add += " ET Q";
+          }
         }
       }
       commit(out + add);
@@ -3475,6 +3521,12 @@
       }
       el.style.left = p[0] + "px";
       el.style.top = p[1] + "px";
+      if (e.align === "center" || e.align === "right") {
+        // inside the block's own width: the box spans it and the browser places the line
+        el.style.left = vp.convertToViewportPoint(x, pl.y)[0] + "px";
+        el.style.width = Math.max(size, width) * s + "px";
+        el.style.textAlign = e.align;
+      }
       el.style.fontSize = (size * s) + "px";
       el.style.fontFamily = CSS_FONT[e.fontName] || CSS_FONT.Helvetica;
       const [r, g, bl] = e.fill || [0, 0, 0];
@@ -4140,14 +4192,14 @@
               // text is written, so a new box matches the page instead of approximating it
               o.lines.forEach((line, i) => {
                 if (!line) return;
-                const p = pt(o.x + TPAD, o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
+                const p = pt(o.x + TPAD + boxAlignShift(o, line, o.docFont), o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
                 docText.push({ page: o.page, res: o.fontRes, stream: o.fontStream || null,
                                text: line, size: o.size, x: p.x, y: p.y, color: INKS_RGB[o.color] || [0, 0, 0] });
               });
             } else {
               o.lines.forEach((line, i) => {
                 if (!line) return;
-                const p = pt(o.x + TPAD, o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
+                const p = pt(o.x + TPAD + boxAlignShift(o, line, null, font), o.y + TPAD + i * o.size * LINE + BASELINE * o.size);
                 lp.drawText(line, { x: p.x, y: p.y, size: o.size, font, color, rotate: rot });
               });
             }

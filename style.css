@@ -390,16 +390,19 @@
   .ribbon-group { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 8px; }
   .ribbon-title { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
   .ribbon-status { color: var(--ink); font-weight: 500; }
+  /* the Edit text row is full: its controls carry their own labels, so the small titles go (they stay in the markup for screen readers) */
+  #tx-ribbon .ribbon-title { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
   .ribbon-sep { width: 1px; height: 22px; background: var(--line); }
   .ribbon-field { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); }
-  .ribbon-field select { min-width: 120px; max-width: 190px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  .ribbon-field select { min-width: 110px; max-width: 140px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
+  #rb-font { width: 132px; min-width: 132px; max-width: 132px; }     /* fixed: longer names must not widen the row and push the ribbon taller */
   .ribbon-field input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
   .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; line-height: 1.4; }
   .ribbon-note.warn { color: var(--bad); }
   @media (max-width: 640px) { .ribbon-sep { display: none; } .rpane { gap: 8px 10px; } }
   .groupctl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-soft); }
-  .groupctl input[type=range] { width: 92px; }
-  .groupctl span { min-width: 54px; }
+  .groupctl input[type=range] { width: 70px; }
+  .groupctl span { min-width: 48px; }
   .trun.alongside { outline: 2px dashed var(--bad); background: rgba(194,69,60,0.12); }
   .trun.quiet { background: transparent; outline-color: transparent; }
   .trun.quiet:hover { background: rgba(46,111,216,0.13); outline: 1px solid rgba(46,111,216,0.35); }

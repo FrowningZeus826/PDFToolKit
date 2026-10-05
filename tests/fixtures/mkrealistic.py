@@ -226,3 +226,13 @@ _sp.pages.append(Page(_sp.make_indirect(Dictionary(Type=Name.Page, MediaBox=Arra
     Resources=Dictionary(Font=Dictionary(F8=_f8, F9=_f9)), Contents=_sp.make_stream(b"\n".join(_ops))))))
 _sp.save('fx/split-ops.pdf')
 print('wrote fx/split-ops.pdf')
+
+# A ragged three-line paragraph, for alignment: every line starts at the same x and ends at
+# a different one, so left, centre and right are all distinguishable in the saved file.
+_al = pikepdf.new()
+_alf = _al.make_indirect(Dictionary(Type=Name.Font, Subtype=Name.Type1, BaseFont=Name.Helvetica, Encoding=Name('/WinAnsiEncoding')))
+_al.pages.append(Page(_al.make_indirect(Dictionary(Type=Name.Page, MediaBox=Array([0,0,612,792]),
+    Resources=Dictionary(Font=Dictionary(F1=_alf)),
+    Contents=_al.make_stream(b"BT /F1 11 Tf 13.2 TL 72 700 Td (Short) Tj T* (A somewhat longer line of text here) Tj T* (Mid length line) Tj ET")))))
+_al.save('fx/align.pdf')
+print('wrote fx/align.pdf')
