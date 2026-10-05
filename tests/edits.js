@@ -29,6 +29,9 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
  const tbox=await objFrac(p,'.eobj.t-text');
  // emoji becomes ?
  await p.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await stageClick(p,0.2,0.6); await p.keyboard.type('Hi \u{1F600}'); await sleep(150);
+ await p.$eval('#ep-color',e=>{ e.value='#12ab34'; e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); }); await sleep(200);
+ check('color: a custom colour from the picker shows on the page', await p.evaluate(()=>getComputedStyle(document.querySelector('.eobj.sel .tedit, .eobj.sel .tl')).color)==='rgb(18, 171, 52)');
+ check('color: no palette swatch stays marked when the colour is custom', (await p.$$('#eprops .colorchip.active')).length===0);
  check('edit: unsupported characters flagged', !(await p.$eval('#eprops .warnline',e=>e.hidden)));
  // page 1: checkmark (blue), whiteout over green square, highlight
  await p.click('#e-prev'); await sleep(800);
@@ -65,6 +68,8 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    check('edit: whiteout covers the green square', gr.n===0, `green px ${gr.n}; whiteout ${[wbox.x0,wbox.y0,wbox.x1,wbox.y1].map(v=>v.toFixed(3))}`);
    const yl=H.inkBox(img,(R,G,B)=>R>200&&G>180&&B<150);
    check('edit: highlight drawn', yl.n>50, 'yellow px '+yl.n); }
+ { const img=H.renderPage('edited.pdf',2,72); const g=H.inkBox(img,(R,G,B)=>Math.abs(R-18)<40&&Math.abs(G-171)<40&&Math.abs(B-52)<40);
+   check('color: the custom colour is what gets saved', g.n>15, 'green px '+g.n); }
  check('edit: whiteout still leaves text copyable (as warned)', true);
 
  // ---- Whole document: watermark + page numbers ----
@@ -312,6 +317,49 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    }
    await ap.close(); }
 
+ // ---- fonts: what is previewed is what is saved ----
+ const fontNames=f=>execSync(`pdffonts "${f}"`).toString().split('\n').slice(2).map(l=>l.trim().split(/\s+/)[0]).filter(Boolean);
+ { const fp=(await H.newPage(b,H.LOCAL,false)).p; await fp.setViewport({width:1280,height:900});
+   await upload(fp,'#edit-input',FX('split-ops.pdf')); await fp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+   await fp.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=text]').click()); await fp.waitForFunction(()=>document.querySelectorAll('.trun.block').length>0,{timeout:30000}); await sleep(800);
+   { const r=await fp.evaluate(()=>{const e=document.querySelectorAll('.trun.block')[0].getBoundingClientRect(); return {x:e.left+4,y:e.top+4};}); await fp.mouse.click(r.x,r.y); await sleep(500); }
+   await fp.keyboard.press('Enter'); await sleep(400); await fp.keyboard.type(' typed on the page'); await sleep(600);
+   const pv=await fp.evaluate(()=>({ribbon:document.getElementById('rb-font').value, fam:getComputedStyle(document.querySelector('.tprev')).fontFamily}));
+   check('fonts: typing on the page keeps the document font selected in the ribbon', pv.ribbon==='doc', JSON.stringify(pv));
+   check('fonts: an edited block is previewed in the font the page is drawn with, not Helvetica', /^"?g_d\d+_f\d+/.test(pv.fam), pv.fam);
+   await fp.keyboard.press('Escape'); await sleep(300);
+   await H.applyAndDownload(fp,'#edit-go'); const fd=await H.takeDownloads(fp,1); fs.writeFileSync('font-edit.pdf',fd[0].buf);
+   const before=fontNames(FX('split-ops.pdf')).sort().join(), after=fontNames('font-edit.pdf').sort().join();
+   check('fonts: an edit typed on the page is saved in the document\'s font (no font added to the file)', before===after, before+' -> '+after);
+   await fp.close(); }
+ { const fp=(await H.newPage(b,H.LOCAL,false)).p; await fp.setViewport({width:1280,height:900});
+   await upload(fp,'#edit-input',FX('letter.pdf')); await fp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(2000);
+   const sbb=await (await fp.$('#estage')).boundingBox(); const origFonts=fontNames(FX('letter.pdf')).sort().join();
+   const widths={}; const fams={};
+   for (const [key,expectFont] of [['Helvetica-Bold','Helvetica-Bold'],['Times-Roman','Times-Roman'],['Times-Bold','Times-Bold'],['Courier','Courier']]) {
+     await fp.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await fp.mouse.click(sbb.x+sbb.width*0.15, sbb.y+sbb.height*0.82); await sleep(500);
+     await fp.keyboard.type('Sphinx of black quartz'); await sleep(250);
+     await fp.select('#ep-font', key); await sleep(500);
+     const r=await fp.evaluate(()=>({fam:getComputedStyle(document.querySelector('.tedit')).fontFamily, weight:getComputedStyle(document.querySelector('.tedit')).fontWeight, w:Math.round(document.querySelector('.eobj.sel').getBoundingClientRect().width)}));
+     widths[key]=r.w; fams[key]=r;
+     await H.applyAndDownload(fp,'#edit-go'); const bd=await H.takeDownloads(fp,1); const f=`font-box-${key}.pdf`; fs.writeFileSync(f,bd[0].buf);
+     const names=fontNames(f);
+     check(`fonts: a text box set in ${key} is saved in ${expectFont}`, names.includes(expectFont), names.join());
+     await fp.evaluate(()=>document.getElementById('docbar-undo').click()); await sleep(1500);
+   }
+   check('fonts: the preview shows the chosen face (serif for Times, monospace for Courier, bold for bold)',
+     /serif/.test(fams['Times-Roman'].fam) && !/sans/.test(fams['Times-Roman'].fam) && /monospace/.test(fams['Courier'].fam) && +fams['Helvetica-Bold'].weight>=600 && +fams['Times-Bold'].weight>=600, JSON.stringify(fams));
+   check('fonts: the box is sized in the chosen face (Courier is wider than Times for the same text)', widths['Courier']>widths['Times-Roman']+20, JSON.stringify(widths));
+   // the document's own embedded font: previewed in the font the page loaded, written without adding a font
+   await fp.evaluate(()=>document.querySelector('#annot-tools .tool[data-tool=text]').click()); await fp.mouse.click(sbb.x+sbb.width*0.15, sbb.y+sbb.height*0.82); await sleep(500);
+   await fp.keyboard.type('Sphinx of black quartz'); await sleep(250);
+   const docOpt=await fp.$$eval('#ep-font option',os=>os.map(o=>o.value).find(v=>/^doc:/.test(v)));
+   await fp.select('#ep-font', docOpt); await sleep(500);
+   const df=await fp.evaluate(()=>{const fam=getComputedStyle(document.querySelector('.tedit')).fontFamily; return {fam, loaded:document.fonts.check('12px '+fam.split(',')[0])};});
+   check('fonts: a text box set in the document\'s own font is previewed in the font the page loaded', /^"?g_d\d+_f\d+/.test(df.fam) && df.loaded, JSON.stringify(df));
+   await H.applyAndDownload(fp,'#edit-go'); const dd=await H.takeDownloads(fp,1); fs.writeFileSync('font-box-doc.pdf',dd[0].buf);
+   check('fonts: and is saved in that font, with no other font added', fontNames('font-box-doc.pdf').sort().join()===origFonts && execSync('pdftotext font-box-doc.pdf -').toString().includes('Sphinx of black quartz'), fontNames('font-box-doc.pdf').join()+' vs '+origFonts);
+   await fp.close(); }
  // ---- the form-field panel can be closed, and comes back when a field is tapped ----
  { const fm=(await H.newPage(b,H.LOCAL,false)).p; await fm.setViewport({width:1280,height:900});
    await upload(fm,'#edit-input',FX('form.pdf')); await fm.waitForFunction(()=>!document.querySelector('#edit-modes .segbtn[data-emode=form]').disabled,{timeout:30000}); await sleep(1200);
