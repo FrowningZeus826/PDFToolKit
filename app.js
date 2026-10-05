@@ -1827,6 +1827,12 @@
     $("e-prev").disabled = ed.page <= 0;
     $("e-next").disabled = ed.page >= ed.pageCount - 1;
     $("e-label").textContent = "Page " + (ed.page + 1) + " of " + ed.pageCount;
+    $("e-count").textContent = ed.pageCount;
+    { const box = $("e-page");
+      box.max = ed.pageCount;
+      box.style.width = Math.max(3, String(ed.pageCount).length + 1.6) + "ch";
+      if (document.activeElement !== box) box.value = ed.page + 1;      // never overwrite what is being typed
+    }
     editSummary();
     renderProps();
     renderTextPanel();
@@ -3648,6 +3654,32 @@
     b.addEventListener("click", () => { if ($("docribbon").classList.contains("collapsed")) setRibbonCollapsed(false, true); });
     b.addEventListener("dblclick", () => { if (b.classList.contains("active")) setRibbonCollapsed(true, true); });
   });
+  // ---------- Jump to a page ----------
+  // Type a number and press Enter (or leave the box): out-of-range numbers are brought back into
+  // range, and anything that is not a number puts the current page back.
+  async function goToPage(raw){
+    const n = parseInt(String(raw).replace(/[^\d-]/g, ""), 10);
+    if (!ed.view || !isFinite(n)) { $("e-page").value = ed.page + 1; return; }
+    const target = Math.min(ed.pageCount, Math.max(1, n)) - 1;
+    $("e-page").value = target + 1;
+    if (target === ed.page) return;
+    ed.page = target; ed.sel = null;
+    await editRender();
+  }
+  $("e-page").addEventListener("focus", () => $("e-page").select());
+  $("e-page").addEventListener("keydown", ev => {
+    if (ev.key === "Enter") { ev.preventDefault(); goToPage($("e-page").value); $("e-page").select(); }
+    else if (ev.key === "Escape") { ev.preventDefault(); $("e-page").value = ed.page + 1; $("e-page").blur(); }
+    else if (ev.key === "ArrowUp" || ev.key === "ArrowDown") { ev.preventDefault(); goToPage((parseInt($("e-page").value, 10) || ed.page + 1) + (ev.key === "ArrowUp" ? 1 : -1)); }
+    if (!(ev.ctrlKey || ev.metaKey)) ev.stopPropagation();      // typing here is not a page shortcut, but Ctrl+F, Ctrl+G and Ctrl+S still work
+  });
+  $("e-page").addEventListener("blur", () => { if ($("e-page").value !== String(ed.page + 1)) goToPage($("e-page").value); });
+  document.addEventListener("keydown", ev => {                 // Ctrl/Cmd+G: "Go to page", as in a word processor
+    if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey || ev.key.toLowerCase() !== "g") return;
+    if (!ed.view || $("edit-work").hidden || !$("panel-document").classList.contains("active")) return;
+    ev.preventDefault(); $("e-page").focus();
+  });
+
   // ---------- Find in the document ----------
   // Every page's text is read once (through the same reader that draws the page) and searched
   // as plain strings, so matches can cross the pieces a line is drawn in. Hits are highlighted
@@ -3762,7 +3794,7 @@
   $("find-input").addEventListener("keydown", ev => {
     if (ev.key === "Enter") { ev.preventDefault(); findGo(find.cur + (ev.shiftKey ? -1 : 1)); }
     else if (ev.key === "Escape") { ev.preventDefault(); closeFind(); }
-    ev.stopPropagation();                 // typing here is not a page shortcut
+    if (!(ev.ctrlKey || ev.metaKey)) ev.stopPropagation();     // typing here is not a page shortcut, but Ctrl+G and Ctrl+S still work
   });
   $("find-next").addEventListener("click", () => findGo(find.cur + 1));
   $("find-prev").addEventListener("click", () => findGo(find.cur - 1));

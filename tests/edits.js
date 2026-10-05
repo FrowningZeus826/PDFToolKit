@@ -886,6 +886,33 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      const m=await mp.p.evaluate(()=>({parent:document.getElementById('eprops').parentElement.className, hidden:document.getElementById('eprops').hidden}));
      check('props: on a phone the controls stay in the panel instead of covering the page', m.parent==='ctlcol' && !m.hidden, JSON.stringify(m));
      await mp.p.close(); }
+   // ---- jump to a page by typing its number ----
+   { const lp=H.path.resolve(__dirname,'fx','long.pdf');
+     { const d=await PDFDocument.create(); for (let i=1;i<=40;i++){ const pg=d.addPage([612,792]); pg.drawText('Section '+i+' of the long document',{x:72,y:700,size:20}); } fs.writeFileSync(lp, await d.save()); }
+     const jp=(await H.newPage(b,H.LOCAL,false)).p; await jp.setViewport({width:1280,height:900});
+     await upload(jp,'#edit-input',lp); await jp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+     const where=()=>jp.evaluate(()=>({box:document.getElementById('e-page').value, label:document.getElementById('e-label').textContent, count:document.getElementById('e-count').textContent}));
+     const jump=async v=>{ await jp.click('#e-page',{clickCount:3}); await jp.keyboard.type(String(v)); await jp.keyboard.press('Enter'); await sleep(1200); return where(); };
+     let w=await where();
+     check('page box: shows the current page and the page count', w.box==='1' && w.count==='40' && w.label==='Page 1 of 40', JSON.stringify(w));
+     w=await jump(27); const ink=execSync('echo').toString()&&await jp.evaluate(()=>{const c=document.getElementById('estage-canvas'); return c.width>0;});
+     check('page box: typing a number and pressing Enter jumps there', w.box==='27' && w.label==='Page 27 of 40', JSON.stringify(w));
+     await jp.keyboard.down('Control'); await jp.keyboard.press('f'); await jp.keyboard.up('Control'); await sleep(300);
+     await jp.keyboard.type('Section 27 of'); await sleep(1300);
+     { const fc=await jp.$eval('#find-count',e=>e.textContent), pg=await jp.$eval('#e-label',e=>e.textContent); check('page box: the page it jumped to really is that page (found by search)', fc==='1 of 1' && pg==='Page 27 of 40', fc+' / '+pg); }
+     await jp.keyboard.press('Escape'); await sleep(200);
+     w=await jump(999); check('page box: a number past the end goes to the last page', w.box==='40' && w.label==='Page 40 of 40', JSON.stringify(w));
+     w=await jump(0); check('page box: zero goes to the first page', w.box==='1' && w.label==='Page 1 of 40', JSON.stringify(w));
+     await jump(12); await jp.click('#e-page',{clickCount:3}); await jp.keyboard.type('abc'); await jp.keyboard.press('Enter'); await sleep(600); w=await where();
+     check('page box: text that is not a number puts the current page back', w.box==='12' && w.label==='Page 12 of 40', JSON.stringify(w));
+     await jp.click('#e-page',{clickCount:3}); await jp.keyboard.type('30'); await jp.keyboard.press('Escape'); await sleep(300); w=await where();
+     check('page box: Escape abandons what was typed', w.box==='12' && w.label==='Page 12 of 40', JSON.stringify(w));
+     await jp.evaluate(()=>document.activeElement&&document.activeElement.blur()); await jp.keyboard.down('Control'); await jp.keyboard.press('g'); await jp.keyboard.up('Control'); await sleep(200);
+     check('page box: Ctrl+G puts the cursor in the page box', await jp.evaluate(()=>document.activeElement&&document.activeElement.id==='e-page'));
+     await jp.keyboard.type('5'); await jp.keyboard.press('Enter'); await sleep(900); w=await where();
+     check('page box: Ctrl+G, a number and Enter works from the keyboard alone', w.box==='5' && w.label==='Page 5 of 40', JSON.stringify(w));
+     await jp.click('#e-next'); await sleep(900); w=await where(); check('page box: the arrows still work and update the box', w.box==='6' && w.label==='Page 6 of 40', JSON.stringify(w));
+     await jp.close(); fs.unlinkSync(lp); }
    // ---- find in the document ----
    { const fp=(await H.newPage(b,H.LOCAL,false)).p; await fp.setViewport({width:1280,height:900});
      await upload(fp,'#edit-input',FX('quote.pdf')); await fp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
