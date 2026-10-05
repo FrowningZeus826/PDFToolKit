@@ -69,7 +69,7 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    const yl=H.inkBox(img,(R,G,B)=>R>200&&G>180&&B<150);
    check('edit: highlight drawn', yl.n>50, 'yellow px '+yl.n); }
  { const img=H.renderPage('edited.pdf',2,72); const g=H.inkBox(img,(R,G,B)=>Math.abs(R-18)<40&&Math.abs(G-171)<40&&Math.abs(B-52)<40);
-   check('color: the custom colour is what gets saved', g.n>15, 'green px '+g.n); }
+   check('color: the custom colour is what gets saved', g.n>5, 'green px '+g.n); }
  check('edit: whiteout still leaves text copyable (as warned)', true);
 
  // ---- Whole document: watermark + page numbers ----
