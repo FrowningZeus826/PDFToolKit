@@ -173,7 +173,37 @@ pieces removed, since a manifest and a service worker mean nothing on a `file://
 `./build.sh --no-test` skips the suites. `python3 build.py` still works on its own if you
 only want the site.
 
-The tests drive a real headless Chromium and check the output with external tools —
+### The PDF corpus
+
+`tests/corpus.js` runs about 65 different PDFs through the tool's main flows: open and render, rotate a
+page, remove hidden info, compress, edit a word in place and redact a line. Every saved result is
+checked by tools that are not the code under test (`qpdf --check`, `pikepdf`, `pdftotext`, `pdftoppm`):
+the structure must be valid, the page count unchanged, the edit present and the redacted word gone,
+and bookmarks, form fields, layers, page labels and tags must survive a rotation.
+
+The files come from `tests/fixtures/mkcorpus.py` and `mkchrome.js`, so nothing is a binary in the repo:
+
+- **Producers:** reportlab (standard-14 and embedded TrueType, forms, outlines, 150 pages, CJK,
+  Hebrew, Devanagari), LibreOffice Writer/Calc (plain, PDF/A-1b, tagged), headless Chromium, and
+  poppler's Cairo.
+- **Versions and structure:** PDF 1.3, 1.5 with object streams, 1.7 linearized, 2.0, uncompressed,
+  and an incremental update with two revisions.
+- **Content streams:** kerned `TJ` arrays, `Tc/Tw/Tz/Ts`, split streams, nested transforms, text
+  matrices, Form XObjects, invisible OCR text, escapes, inline images, filter chains, and marked content.
+- **Geometry:** CropBox (also offset), UserUnit, all rotations, negative and reversed MediaBoxes,
+  inherited attributes, mixed page sizes.
+- **Privacy and extras:** XMP, JavaScript, attachments, annotations, layers, page labels.
+- **Damaged files:** truncated, wrong cross-reference offsets, missing `%%EOF`, bytes before the
+  header, a lying `/Length`. These must open or be refused with a message, never hang.
+
+```bash
+python3 fixtures/mkcorpus.py && node fixtures/mkchrome.js   # build the corpus (skips what isn't installed)
+node corpus.js                                              # run it  (CORPUS_ONLY='^lo-' to filter, CORPUS_JOBS=4)
+```
+
+Finding a new problem in a real file? Reproduce it as a small entry in `mkcorpus.py` so it stays fixed.
+
+The other suites drive a real headless Chromium and check the output with external tools —
 `qpdf`, `pikepdf`, `pyHanko`, `pdftotext` and OpenSSL — rather than trusting the code that
 produced it.
 
