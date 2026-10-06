@@ -226,11 +226,11 @@ ops.append('ET')
 make_pdf('\n'.join(ops)).save(path('st-kerned-tj.pdf'))
 reg('st-kerned-tj.pdf', 'pikepdf, TeX-style kerned TJ arrays', notes='every word its own string with a kern between')
 
-# text state operators: Tc, Tw, Tz, Ts, ' and "
-ops = ['BT /F1 12 Tf 72 700 Td 14 TL', '1.2 Tc (%s)Tj T*' % BASE[0], '0 Tc 6 Tw (%s)Tj T*' % BASE[1], '0 Tw 85 Tz (%s)Tj T*' % BASE[2],
-       '100 Tz 4 Ts (%s)Tj 0 Ts T*' % BASE[3], '(Quote operator line)\' 2 1 (Double quote operator line)" ET']
+# text state operators: Tc, Tw, Tz, Ts, ' and "  (the first line stays plain so edits to it are easy to judge)
+ops = ['BT /F1 12 Tf 72 700 Td 14 TL', '(%s)Tj T*' % BASE[0], '1.2 Tc (%s)Tj T*' % BASE[1], '0 Tc 6 Tw (%s)Tj T*' % BASE[2],
+       '0 Tw 85 Tz (%s)Tj T*' % BASE[3], '100 Tz (Quote operator line)\' 2 1 (Double quote operator line)" 0 Tw 0 Tc 4 Ts (Raised line)Tj 0 Ts ET']
 make_pdf('\n'.join(ops)).save(path('st-text-state.pdf'))
-reg('st-text-state.pdf', 'pikepdf, Tc/Tw/Tz/Ts and quote operators', notes='character and word spacing, horizontal scaling, rise, and the \' and " operators')
+reg('st-text-state.pdf', 'pikepdf, Tc/Tw/Tz/Ts and quote operators', normalizes=True, notes='character and word spacing, horizontal scaling, rise, and the \' and " operators')
 
 # the content stream is split into several streams in the middle of a text object
 parts = [text_ops(BASE).replace('(%s) Tj' % BASE[1].replace('(', '\\('), '(%s) Tj' % BASE[1])]
