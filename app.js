@@ -2719,10 +2719,19 @@
         while (j < n && depth) { if (text[j] === "\\") j++; else if (text[j] === "(") depth++; else if (text[j] === ")") depth--; j++; }
         operands.push({ type: "str", start: i, end: j }); i = j; continue;
       }
-      if (c === "<" && text[i + 1] !== "<") { const j = text.indexOf(">", i); operands.push({ type: "str", start: i, end: j + 1 }); i = j + 1; continue; }
+      if (c === "<" && text[i + 1] !== "<") { let j = text.indexOf(">", i); j = j < 0 ? n : j + 1; operands.push({ type: "str", start: i, end: j }); i = j; continue; }
       if (c === "<" && text[i + 1] === "<") { // dictionary: skip it
+        // Strings inside the dictionary can contain ">" too: marked content from Word and LibreOffice
+        // writes /ActualText<feff0041>>>, whose hex string ends right before the dictionary does.
         let depth = 1, j = i + 2;
-        while (j < n && depth) { if (text[j] === "<" && text[j + 1] === "<") { depth++; j += 2; } else if (text[j] === ">" && text[j + 1] === ">") { depth--; j += 2; } else j++; }
+        while (j < n && depth) {
+          const d = text[j];
+          if (d === "<" && text[j + 1] === "<") { depth++; j += 2; }
+          else if (d === ">" && text[j + 1] === ">") { depth--; j += 2; }
+          else if (d === "<") { const k = text.indexOf(">", j); j = k < 0 ? n : k + 1; }
+          else if (d === "(") { let dp = 1; j++; while (j < n && dp) { if (text[j] === "\\") j++; else if (text[j] === "(") dp++; else if (text[j] === ")") dp--; j++; } }
+          else j++;
+        }
         operands.push({ type: "dict", start: i, end: j }); i = j; continue;
       }
       if (c === "[") { let depth = 1, j = i + 1;
@@ -2734,6 +2743,7 @@
       if (/[\d+\-.]/.test(c)) { let j = i; while (j < n && /[\d+\-.eE]/.test(text[j])) j++; operands.push({ type: "num", value: text.slice(i, j) }); i = j; continue; }
       // operator
       let j = i; while (j < n && !isWS(text[j]) && !"/[]<>(){}%".includes(text[j])) j++;
+      if (j === i) { i++; continue; }          // a stray delimiter (")", "]", ">"...): skip it so malformed content can never stall the parser
       const op = text.slice(i, j);
       const opEnd = j;
       // The transform is part of the graphics state: without saving and restoring it, a

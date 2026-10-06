@@ -1,0 +1,12 @@
+const H=require('./harness'); const {sleep,upload}=H;
+(async()=>{ const b=await H.launch(); const {p,errors}=await H.newPage(b,H.LOCAL,false);
+ await upload(p,'#edit-input',process.argv[2]);
+ await p.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+ const cdp=await p.createCDPSession();
+ cdp.on('Debugger.paused',e=>{ console.log(JSON.stringify(e.callFrames.slice(0,14).map(f=>f.functionName+' @'+f.location.lineNumber+':'+f.location.columnNumber),null,1)); process.exit(0); });
+ await cdp.send('Debugger.enable');
+ p.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=text]').click()).catch(()=>{});
+ await sleep(10000);
+ cdp.send('Debugger.pause').catch(()=>{});
+ setTimeout(()=>{console.log('no pause event'); process.exit(1);},15000);
+})();

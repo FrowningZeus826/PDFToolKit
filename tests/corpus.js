@@ -58,7 +58,7 @@ function inkFraction(img) { let n = 0; for (let i = 0; i < img.data.length; i +=
 // ---------- one file ----------
 async function runFile(b, e) {
   const R = [];
-  const rec = (name, ok, detail = '') => R.push({ name: `${e.name}: ${name}`, ok: !!ok, detail });
+  const rec = (name, ok, detail = '') => { if (process.env.CORPUS_TRACE) console.error('   ..', e.name, name, ok ? 'ok' : 'FAIL'); R.push({ name: `${e.name}: ${name}`, ok: !!ok, detail }); };
   const src = path.join(DIR, e.name);
   const srcCheck = sh(`qpdf --check "${src}"`).rc;
   const tag = e.name.replace(/\.pdf$/, '');
@@ -282,7 +282,7 @@ async function runFile(b, e) {
         const e = queue.shift();
         const t0 = Date.now();
         let R;
-        try { R = await runFile(b, e); } catch (err) { R = [{ name: `${e.name}: harness`, ok: false, detail: String(err.stack || err).slice(0, 200) }]; }
+        try { R = await runFile(b, e); } catch (err) { R = [{ name: `${e.name}: harness`, ok: false, detail: String(err.stack || err).slice(0, 900) }]; }
         results.set(e.name, R);
         const bad = R.filter(r => !r.ok).length;
         console.error(`   [${id}] ${e.name.padEnd(30)} ${R.length - bad}/${R.length} ok  ${((Date.now() - t0) / 1000).toFixed(0)}s`);
