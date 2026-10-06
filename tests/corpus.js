@@ -197,7 +197,10 @@ async function runFile(b, e) {
       await open(ctx.p);
       await tool(ctx.p, 'prepare'); await sleep(700);
       await ctx.p.evaluate(() => document.querySelector('#prep-modes [data-mode=compress]').click()); await sleep(500);
-      await H.applyStep(ctx.p, '#cmp-go', 180000).catch(() => {});
+      await ctx.p.evaluate(() => document.getElementById('cmp-go').click());
+      // done = a step was added, or the compressor said something (success, error, or "already compact")
+      await ctx.p.waitForFunction(() => (+(document.getElementById('docbar').dataset.steps || '0') > 0) ||
+        [...document.querySelectorAll('#opt-status, #prep-status')].some(x => /success|info|error/.test(x.className) && x.textContent.trim()), { timeout: 120000 }).catch(() => {});
       const st = await ctx.p.evaluate(() => { const s = [...document.querySelectorAll('#opt-status, #prep-status')].map(x => x.className + ':' + x.textContent).join(' '); return s; });
       const saved = await ctx.p.evaluate(() => (document.getElementById('docbar').dataset.steps || '0'));
       if (+saved > 0) {
