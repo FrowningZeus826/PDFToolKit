@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="-64 -64 640 640">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <title>PDF Tool Kit</title>
-  <rect x="-64" y="-64" width="640" height="640" rx="0" fill="#16181D"/>
+  <rect width="512" height="512" rx="0" fill="#16181D"/>
   <!-- the document, with a folded corner -->
   <path d="M132 76h156l84 84v248a24 24 0 0 1-24 24H132a24 24 0 0 1-24-24V100a24 24 0 0 1 24-24z" fill="#F7F8FA"/>
   <path d="M288 76v60a24 24 0 0 0 24 24h60z" fill="#C9CFDC"/>
