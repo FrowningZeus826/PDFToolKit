@@ -36,7 +36,8 @@ jobs:
       - name: Install the validators the suites check output with
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends qpdf poppler-utils fonts-liberation openssl
+          sudo apt-get install -y --no-install-recommends qpdf poppler-utils fonts-liberation openssl \
+            libreoffice-writer libreoffice-calc imagemagick fonts-dejavu-core fonts-freefont-ttf fonts-ipafont-gothic fonts-tlwg-loma-otf
           python -m pip install --upgrade pip
           python -m pip install pikepdf pyhanko pillow reportlab
 
@@ -58,6 +59,8 @@ jobs:
         run: |
           npm ci
           bash fixtures/make-fixtures.sh
+          python3 fixtures/mkcorpus.py
+          node fixtures/mkchrome.js
 
       - name: Main suite
         working-directory: tests
@@ -78,3 +81,7 @@ jobs:
       - name: Installable app and service worker
         working-directory: tests
         run: node pwa.js
+
+      - name: Corpus of varied PDFs (producers, versions, structure, damage)
+        working-directory: tests
+        run: CORPUS_JOBS=3 node corpus.js

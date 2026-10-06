@@ -280,12 +280,22 @@
   }
 
   // Every tool saves through here: embed pending fonts/images, compact, write.
+  // PDF/A-1 forbids object and cross-reference streams, and the writer refuses to save one that has
+  // them. The file says which part it follows in its XMP metadata.
+  function isPdfA1(doc){
+    try {
+      const m = doc.catalog.lookup(N("Metadata"));
+      if (!(m instanceof PDFRawStream)) return false;
+      const xmp = bytesToBin(PDFLib.decodePDFRawStream(m).decode());
+      return /pdfaid:part(?:>|="|='|\s*=\s*["'])\s*1\b/.test(xmp);
+    } catch (e) { return false; }
+  }
   async function saveDoc(doc, opts){
     opts = opts || {};
     await doc.flush();
     const stats = compactDoc(doc);
     if (opts.beforeWrite) opts.beforeWrite(doc);
-    const bytes = await doc.save({ useObjectStreams: opts.objectStreams !== false, updateFieldAppearances: false });
+    const bytes = await doc.save({ useObjectStreams: opts.objectStreams !== false && !isPdfA1(doc), updateFieldAppearances: false });
     if (opts.stats) Object.assign(opts.stats, stats);
     return bytes;
   }
@@ -913,18 +923,41 @@
     pagesGrid.refresh(); pagesUi();
   });
 
+  // Reordering and rotating keep the document itself, so bookmarks, form fields, layers, page
+  // labels, tags and the title all survive. Removing pages or combining files builds a new document
+  // from copied pages, which cannot carry those along; the result lists what was left behind.
   async function buildPagesDoc(items){
-    const out = await PDFDocument.create();
     const bySrc = new Map();
     for (const it of items) {
       const src = pgs.sources.find(s => s.id === it.srcId);
       if (!bySrc.has(it.srcId)) bySrc.set(it.srcId, await loadPdf(src.info.bytes.slice(0), src.info.file.name));
     }
+    const rot = (page, extra) => { if (extra) page.setRotation(degrees(((page.getRotation().angle + extra) % 360 + 360) % 360)); };
+    if (bySrc.size === 1) {
+      const doc = [...bySrc.values()][0];
+      if (items.length === doc.getPageCount() && new Set(items.map(it => it.page)).size === items.length) {
+        const pages = doc.getPages();
+        const ordered = items.map(it => { const pg = pages[it.page - 1]; rot(pg, it.rot); return pg; });
+        if (!items.every((it, k) => it.page === k + 1)) {
+          for (let k = doc.getPageCount() - 1; k >= 0; k--) doc.removePage(k);
+          ordered.forEach((pg, k) => doc.insertPage(k, pg));
+        }
+        return doc;
+      }
+    }
+    const out = await PDFDocument.create();
     for (const it of items) {
       const [copied] = await out.copyPages(bySrc.get(it.srcId), [it.page - 1]);
-      if (it.rot) copied.setRotation(degrees(((copied.getRotation().angle + it.rot) % 360 + 360) % 360));
+      rot(copied, it.rot);
       out.addPage(copied);
     }
+    const lost = [];
+    for (const d of bySrc.values()) {
+      const cat = d.catalog;
+      [["AcroForm", "form fields"], ["Outlines", "bookmarks"], ["PageLabels", "page numbering"], ["OCProperties", "layers"], ["StructTreeRoot", "accessibility tags"]]
+        .forEach(([k, label]) => { if (cat.has(N(k)) && !lost.includes(label)) lost.push(label); });
+    }
+    out.__left = lost;
     return out;
   }
 
@@ -939,7 +972,8 @@
       if (pagesGrid.items.some(i => i.rot)) label.push("rotated pages");
       if (pgs.loaded && pagesGrid.items.length !== pgs.loaded.pages) label.push(plural(pagesGrid.items.length, "page") + " kept");
       await applyResult(await saveDoc(out), label.join(", ") || "reordered pages");
-      setStatus(pagesStatus, "success", "Applied. The document is now " + plural(pagesGrid.items.length, "page") + " \u2014 use Download when you're finished.");
+      setStatus(pagesStatus, "success", "Applied. The document is now " + plural(pagesGrid.items.length, "page") + " \u2014 use Download when you're finished." +
+        (out.__left && out.__left.length ? " Removing pages or combining files can't carry over " + out.__left.join(", ") + ", so they are not in this copy." : ""));
     } catch (err) {
       setStatus(pagesStatus, "error", err.message || "Couldn't apply those changes.");
     } finally { pgs.busy = false; pagesUi(); }
@@ -2719,10 +2753,19 @@
         while (j < n && depth) { if (text[j] === "\\") j++; else if (text[j] === "(") depth++; else if (text[j] === ")") depth--; j++; }
         operands.push({ type: "str", start: i, end: j }); i = j; continue;
       }
-      if (c === "<" && text[i + 1] !== "<") { const j = text.indexOf(">", i); operands.push({ type: "str", start: i, end: j + 1 }); i = j + 1; continue; }
+      if (c === "<" && text[i + 1] !== "<") { let j = text.indexOf(">", i); j = j < 0 ? n : j + 1; operands.push({ type: "str", start: i, end: j }); i = j; continue; }
       if (c === "<" && text[i + 1] === "<") { // dictionary: skip it
+        // Strings inside the dictionary can contain ">" too: marked content from Word and LibreOffice
+        // writes /ActualText<feff0041>>>, whose hex string ends right before the dictionary does.
         let depth = 1, j = i + 2;
-        while (j < n && depth) { if (text[j] === "<" && text[j + 1] === "<") { depth++; j += 2; } else if (text[j] === ">" && text[j + 1] === ">") { depth--; j += 2; } else j++; }
+        while (j < n && depth) {
+          const d = text[j];
+          if (d === "<" && text[j + 1] === "<") { depth++; j += 2; }
+          else if (d === ">" && text[j + 1] === ">") { depth--; j += 2; }
+          else if (d === "<") { const k = text.indexOf(">", j); j = k < 0 ? n : k + 1; }
+          else if (d === "(") { let dp = 1; j++; while (j < n && dp) { if (text[j] === "\\") j++; else if (text[j] === "(") dp++; else if (text[j] === ")") dp--; j++; } }
+          else j++;
+        }
         operands.push({ type: "dict", start: i, end: j }); i = j; continue;
       }
       if (c === "[") { let depth = 1, j = i + 1;
@@ -2734,6 +2777,7 @@
       if (/[\d+\-.]/.test(c)) { let j = i; while (j < n && /[\d+\-.eE]/.test(text[j])) j++; operands.push({ type: "num", value: text.slice(i, j) }); i = j; continue; }
       // operator
       let j = i; while (j < n && !isWS(text[j]) && !"/[]<>(){}%".includes(text[j])) j++;
+      if (j === i) { i++; continue; }          // a stray delimiter (")", "]", ">"...): skip it so malformed content can never stall the parser
       const op = text.slice(i, j);
       const opEnd = j;
       // The transform is part of the graphics state: without saving and restoring it, a
