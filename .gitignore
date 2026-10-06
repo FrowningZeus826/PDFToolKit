@@ -10,3 +10,4 @@ tests/rp.png
 tests/shot-*.png
 tests/*.pdf
 tests/*.png
+tests/corpus-out/
