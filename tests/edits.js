@@ -333,7 +333,7 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
    { const c=await fp.evaluate(()=>[...document.querySelectorAll('.tprev')].map(e=>getComputedStyle(e).color));
      check('edit colour: the ribbon colour shows on the block as it is typed', c.length>0 && c.every(x=>x==='rgb(18, 171, 52)'), c.join('|')); }
    { const o=await fp.evaluate(()=>{const s=document.getElementById('rb-font'); return {label:s.selectedOptions[0].textContent, w:Math.round(s.getBoundingClientRect().width), h:Math.round(document.getElementById('docribbon').getBoundingClientRect().height)};});
-     check('edit font: the font box names the document font and is wide enough for it', /^Document: \S+/.test(o.label) && o.w>=170, JSON.stringify(o)); }
+     check('edit font: the font box names the document font plainly and is wide enough for it', o.label.length>2 && !/^Match the document$/.test(o.label) && o.w>=160, JSON.stringify(o)); }
    await fp.keyboard.press('Escape'); await sleep(300);
    await H.applyAndDownload(fp,'#edit-go'); const fd=await H.takeDownloads(fp,1); fs.writeFileSync('font-edit.pdf',fd[0].buf);
    { const img=H.renderPage('font-edit.pdf',1,72); const g=H.inkBox(img,(R,G,B)=>Math.abs(R-18)<50&&Math.abs(G-171)<50&&Math.abs(B-52)<50);
@@ -1060,6 +1060,35 @@ async function objFrac(p,sel){ return p.evaluate(s=>{const e=document.querySelec
      check('props: selecting the item again brings the controls back', !(await p.$eval('#eprops',e=>e.hidden)));
      await p.click('.eobj.sel .ex'); await sleep(400);
      check('props: the X on the item deletes it and the controls go away', (await p.$$('.eobj')).length===g.n-1 && await p.$eval('#eprops',e=>e.hidden)); }
+   // ---- deleting a text box that is already in the PDF ----
+   { const dp=(await H.newPage(b,H.LOCAL,false)).p; await dp.setViewport({width:1280,height:900});
+     await upload(dp,'#edit-input',FX('letter.pdf')); await dp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);
+     await dp.evaluate(()=>document.querySelector('#edit-modes .segbtn[data-emode=text]').click());
+     await dp.waitForFunction(()=>document.querySelectorAll('.trun.block').length>0,{timeout:30000}); await sleep(700);
+     check('delete: the button is there and waits for a selection', await dp.$eval('#tx-delete',e=>e.disabled && e.dataset.state==='delete'));
+     const rh=await dp.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height));
+     const pick=async i=>{ await dp.evaluate(i=>document.querySelectorAll('.trun.block')[i].scrollIntoView({block:'center'}),i); await sleep(250);
+       const sp=await dp.evaluate(i=>{const r=document.querySelectorAll('.trun.block')[i].getBoundingClientRect();return {x:r.left+4,y:r.top+4};},i); await dp.mouse.click(sp.x,sp.y); await sleep(500); };
+     await pick(1);
+     const orig=await dp.$eval('#tx-text',e=>e.value); const firstWord=orig.split(/\s+/)[0];
+     check('delete: selecting a box enables it, and the ribbon stays one row', await dp.$eval('#tx-delete',e=>!e.disabled) && (await dp.$eval('#docribbon',e=>Math.round(e.getBoundingClientRect().height)))<=rh+1, rh+'px');
+     check('delete: a selected box has a corner X', (await dp.$$('.trun.block.sel .tex')).length===1);
+     await dp.click('#tx-delete'); await sleep(500);
+     check('delete: the box is marked deleted, and the button offers Restore', (await dp.$$('.trun.block.deleted')).length===1 && await dp.$eval('#tx-delete',e=>e.dataset.state==='restore'));
+     await dp.click('#tx-delete'); await sleep(500);
+     check('delete: Restore brings it back', (await dp.$$('.trun.block.deleted')).length===0 && await dp.$eval('#tx-delete',e=>e.dataset.state==='delete'));
+     await dp.evaluate(()=>document.activeElement && document.activeElement.blur()); await dp.keyboard.press('Delete'); await sleep(500);
+     check('delete: the Delete key deletes the selected box', (await dp.$$('.trun.block.deleted')).length===1);
+     await dp.click('.trun.block.sel .tex'); await sleep(500);
+     check('delete: the corner mark restores it', (await dp.$$('.trun.block.deleted')).length===0);
+     await dp.click('.trun.block.sel .tex'); await sleep(500);
+     await H.applyAndDownload(dp,'#edit-go'); const dd=await H.takeDownloads(dp,1); fs.writeFileSync('deleted-box.pdf',dd[0].buf);
+     const after=execSync('pdftotext deleted-box.pdf - 2>/dev/null').toString(), before=execSync('pdftotext fx/letter.pdf - 2>/dev/null').toString();
+     const probe=orig.split('\n')[0].trim();
+     check('delete: the text is gone from the saved file', before.includes(probe) && !after.includes(probe), probe.slice(0,40));
+     check('delete: the other text boxes are untouched', before.split('\n').filter(l=>l.trim() && !orig.includes(l.trim())).every(l=>after.includes(l.trim())));
+     check('delete: the saved file is valid', /No syntax/.test(execSync('qpdf --check deleted-box.pdf 2>&1 || true').toString()));
+     await dp.close(); }
    // ---- typing on the page ----
    { const tp=(await H.newPage(b,H.LOCAL,false)).p; await tp.setViewport({width:1280,height:900});
      await upload(tp,'#edit-input',FX('a.pdf')); await tp.waitForFunction(()=>document.getElementById('estage-canvas').width>0,{timeout:30000}); await sleep(1500);

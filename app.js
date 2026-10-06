@@ -2241,12 +2241,22 @@
 
   // The font and size controls live on the ribbon above the page, where they stay put
   // instead of appearing and disappearing with a side panel.
+  // "LiberationSerif-Bold" -> "Liberation Serif Bold": short enough to fit the font box without a prefix
+  const prettyFont = n => String(n).replace(/[-_,]+/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\s+/g, " ").trim();
   function renderRibbon(){
     const sel = $("rb-font"), size = $("rb-size"), note = $("rb-note");
     if (!sel) return;
     const b = ed.tsel !== null && ed.blocks ? ed.blocks[ed.tsel] : null;
     sel.disabled = size.disabled = !b;
     syncRibbonColors(b, !!b);
+    { const del = $("tx-delete");
+      if (del) {
+        const gone = !!(b && (ed.textEdits.get(ed.tsel) || {}).text === "");
+        del.disabled = !b; del.dataset.state = gone ? "restore" : "delete";
+        del.innerHTML = gone ? ICON_UNDO : ICON_TRASH;
+        del.title = gone ? "Restore the deleted text box" : "Delete this text box (or press the Delete key)";
+        del.setAttribute("aria-label", gone ? "Restore the deleted text box" : "Delete this text box");
+      } }
     if (!b) {
       document.querySelectorAll("#tx-ribbon [data-align]").forEach(btn => { btn.disabled = true; btn.setAttribute("aria-pressed", "false"); btn.classList.remove("armed"); });
       note.textContent = ""; return;          // the status line below the page says how to start; a note here would make the ribbon taller
@@ -2258,7 +2268,7 @@
     if (!built) {
       sel.innerHTML = "";
       const dinfo = docFontFor(b);
-      if (dinfo && dinfo.usable) sel.appendChild(new Option(dinfo.baseFont ? "Document: " + dinfo.baseFont : "Match the document", "doc"));
+      if (dinfo && dinfo.usable) sel.appendChild(new Option(dinfo.baseFont ? prettyFont(dinfo.baseFont) : "Match the document", "doc"));
       [["doc:bold", "Document bold"], ["doc:italic", "Document italic"],
        ["doc:bolditalic", "Document bold italic"], ["doc:regular", "Document regular"]]
         .forEach(([v, label]) => { if (docSiblingFor(b, v.slice(4))) sel.appendChild(new Option(label, v)); });
@@ -2348,6 +2358,26 @@
     if (sel) sel.addEventListener("change", () => { if (ed.tsel !== null) { blockEdit(ed.tsel, blockFontFields(ed.blocks[ed.tsel], sel.value)); drawLayer(); editUi(); } });
     if (size) size.addEventListener("input", () => { if (ed.tsel !== null && +size.value > 0) { blockEdit(ed.tsel, { size: +size.value }); drawLayer(); editUi(); } }); }
 
+  const ICON_TRASH = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/></svg>';
+  const ICON_UNDO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>';
+  // Deleting a text box removes its text from the page when applied; until then it stays marked so it
+  // can be restored. (Emptying the text by hand does the same thing.)
+  function deleteBlock(i){
+    const b = ed.blocks && ed.blocks[i]; if (!b) return;
+    const e = ed.textEdits.get(i);
+    if (e && e.text === "") {                                  // already deleted: bring it back
+      if (e.moved || e.resized || e.align !== "left" || (e.fontName && e.fontName !== fontDefaultFor(b))) blockEdit(i, { text: b.text });
+      else ed.textEdits.delete(i);
+      setStatus(editStatus, "info", "Restored.");
+    } else {
+      ed.typing = null;
+      blockEdit(i, { text: "" });
+      setStatus(editStatus, "success", "Deleted. It leaves the page when you apply the changes; press Restore to bring it back.");
+    }
+    drawLayer(); editUi(); editSummary();
+  }
+  $("tx-delete").addEventListener("click", () => { if (ed.tsel !== null) deleteBlock(ed.tsel); });
+
   function renderTextPanel(){
     const has = ed.tsel !== null && ed.blocks && ed.blocks[ed.tsel];
     const locked = !has && !!ed.lockedSel;
@@ -2396,7 +2426,7 @@
       (e && e.resized ? " \u00b7 " + Math.round(e.width || b.w) + "pt wide" : "") +
       (e && e.leading && Math.abs(e.leading - (b.leading || b.size * LINE)) > 0.3 ? " \u00b7 " + (Math.round(e.leading * 10) / 10) + "pt spacing" : "");
     $("tx-revert").hidden = !e;
-    $("tx-merge").textContent = ed.mergeArmed ? "Pick a block\u2026" : "Merge with\u2026";
+    $("tx-merge").textContent = ed.mergeArmed ? "Pick a block\u2026" : "Merge\u2026";
     $("tx-merge").classList.toggle("armed", !!ed.mergeArmed);
     $("tx-split").textContent = ed.splitArmed ? "Click a gap\u2026" : "Split\u2026";
     $("tx-split").classList.toggle("armed", !!ed.splitArmed);
@@ -2482,6 +2512,11 @@
     if (e.key === "Enter" && ed.tsel !== null && ed.typing === null &&
         !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) {
       e.preventDefault(); beginOnPageEdit(ed.tsel); return;
+    }
+    if ((e.key === "Delete" || e.key === "Backspace") && ed.tsel !== null && ed.typing === null && !ed.lockedSel &&
+        !/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test((document.activeElement || {}).tagName || "") && !(document.activeElement && document.activeElement.isContentEditable)) {
+      const cur = ed.textEdits.get(ed.tsel);
+      if (!cur || cur.text !== "") { e.preventDefault(); deleteBlock(ed.tsel); return; }
     }
     if ((e.key === "Delete" || e.key === "Backspace") && ed.lockedSel &&
         !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) {
@@ -3831,7 +3866,8 @@
       const p2 = vp.convertToViewportPoint(x + w, top - height);
       const el = document.createElement("div");
       const shared = b.stream && ed.formPages && (ed.formPages.get(b.stream) || 1) > 1;
-      el.className = "trun block" + (e ? " changed" : "") + (ed.tsel === i ? " sel" : "") +
+      const gone = !!(e && e.text === "");
+      el.className = "trun block" + (e ? " changed" : "") + (gone ? " deleted" : "") + (ed.tsel === i ? " sel" : "") +
         (ed.mergeArmed && ed.tsel !== i ? " mergeable" : "") + (b.stream ? " fromblock" : "") + (shared ? " shared" : "") +
         (all || e || ed.tsel === i || ed.mergeArmed ? "" : " quiet");
       el.style.left = Math.min(p1[0], p2[0]) - 2 + "px";
@@ -3843,6 +3879,15 @@
                             : " \u00b7 from a reusable block, used only on this page") : "");
       el.addEventListener("pointerdown", ev => startBlockDrag(ev, i, el));
       el.addEventListener("dblclick", ev => { ev.stopPropagation(); beginOnPageEdit(i); });
+      if (gone) el.title = "Deleted \u2014 press Restore in the ribbon to bring it back";
+      if (ed.tsel === i && ed.typing !== i && !ed.mergeArmed && !ed.splitArmed) {
+        const x = document.createElement("button");
+        x.type = "button"; x.className = "tex"; x.textContent = gone ? "\u21ba" : "\u2715";
+        x.setAttribute("aria-label", gone ? "Restore this text box" : "Delete this text box"); x.title = gone ? "Restore" : "Delete this text box";
+        x.addEventListener("pointerdown", ev => ev.stopPropagation());
+        x.addEventListener("click", ev => { ev.stopPropagation(); deleteBlock(i); });
+        el.appendChild(x);
+      }
       eLayer.appendChild(el);
       if (ed.tsel === i && ed.splitArmed && b.runs.length > 1) {
         for (let k = 1; k < b.runs.length; k++) {

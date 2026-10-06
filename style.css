@@ -409,7 +409,7 @@
   .ribbon-sep { width: 1px; height: 22px; background: var(--line); }
   .ribbon-field { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-soft); }
   .ribbon-field select { min-width: 110px; max-width: 140px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
-  #rb-font { width: 176px; min-width: 176px; max-width: 176px; text-overflow: ellipsis; }     /* fixed: longer names must not widen the row and push the ribbon taller */
+  #rb-font { width: 168px; min-width: 168px; max-width: 168px; text-overflow: ellipsis; }     /* fixed: longer names must not widen the row and push the ribbon taller */
   .ribbon-field input[type=number] { width: 64px; padding: 4px 6px; font-size: 13px; border: 1px solid var(--line); border-radius: 4px; background: var(--panel); color: var(--ink); }
   .ribbon-note { color: var(--ink-soft); flex: 1 1 100%; line-height: 1.4; }
   .ribbon-note.warn { color: var(--bad); }
@@ -545,4 +545,7 @@
   .sub-tabs .segbtn:hover:not(:disabled) { color: var(--ink); }
   .sub-tabs .segbtn.active { background: none; color: var(--ink); font-weight: 600; border-bottom-color: var(--gold); }
   #panel-pages .pagesbar { margin: 12px 0; padding: 6px 8px; background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; }
+  #tx-ribbon { gap: 6px 10px; }
+  .trun .tex { position: absolute; top: -13px; right: -13px; width: 24px; height: 24px; border-radius: 50%; border: none; background: var(--black); color: var(--gold); font-size: 12px; line-height: 24px; text-align: center; padding: 0; cursor: pointer; z-index: 3; }
+  .trun.deleted { outline: 2px dashed #B3261E; background: rgba(179,38,30,.08); }
 </style>
