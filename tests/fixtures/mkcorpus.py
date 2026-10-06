@@ -287,7 +287,7 @@ reg('st-empty-pages.pdf', 'pikepdf, blank pages with and without /Contents', not
 pdf = make_pdf(text_ops(BASE))
 raw = pdf.pages[0].Contents.read_bytes()
 import base64
-a85 = base64.a85encode(zlib.compress(raw), adobe=True)
+a85 = base64.a85encode(zlib.compress(raw), adobe=False) + b'~>'
 s = pdf.make_stream(a85, Filter=Array([Name.ASCII85Decode, Name.FlateDecode]))
 pdf.pages[0].Contents = s
 pdf.save(path('st-filter-chain.pdf'))
@@ -303,14 +303,14 @@ def geom(name, mutate, **kw):
 
 geom('geo-cropbox.pdf', lambda pdf, pg: setattr(pg, 'CropBox', Array([36, 36, 576, 756])))
 reg('geo-cropbox.pdf', 'pikepdf, CropBox inside MediaBox', notes='the visible area is smaller than the page')
-geom('geo-cropbox-offset.pdf', lambda pdf, pg: setattr(pg, 'CropBox', Array([100, 300, 500, 760])))
+geom('geo-cropbox-offset.pdf', lambda pdf, pg: setattr(pg, 'CropBox', Array([40, 300, 572, 760])))
 reg('geo-cropbox-offset.pdf', 'pikepdf, CropBox offset from the origin', notes='visible region does not start at 0,0, so coordinates must be translated')
 geom('geo-userunit.pdf', lambda pdf, pg: setattr(pg, 'UserUnit', 2))
 reg('geo-userunit.pdf', 'pikepdf, UserUnit 2', notes='a page whose unit is 2/72 inch')
 for rot in (90, 180, 270):
     geom('geo-rotate-%d.pdf' % rot, lambda pdf, pg, r=rot: setattr(pg, 'Rotate', r))
     reg('geo-rotate-%d.pdf' % rot, 'pikepdf, /Rotate %d' % rot, notes='whole page rotated')
-geom('geo-negative-origin.pdf', lambda pdf, pg: setattr(pg, 'MediaBox', Array([-100, -100, 512, 692])))
+pdf = make_pdf(text_ops(BASE, y=600), media=(-100, -100, 512, 692)); pdf.save(path('geo-negative-origin.pdf'))
 reg('geo-negative-origin.pdf', 'pikepdf, MediaBox with a negative origin', notes='the page starts at -100,-100')
 geom('geo-reversed-box.pdf', lambda pdf, pg: setattr(pg, 'MediaBox', Array([612, 792, 0, 0])))
 reg('geo-reversed-box.pdf', 'pikepdf, MediaBox given corners reversed', notes='legal but unusual: upper right first')
@@ -327,7 +327,7 @@ pdf = pikepdf.new()
 for i in range(6):
     pg = pdf.add_blank_page(page_size=(612, 792))
     pg.Resources = Dictionary(Font=Dictionary(F1=std_font(pdf)))
-    pg.Contents = pdf.make_stream(text_ops(['Page %d %s %s' % (i + 1, PROBE, CONTROL)] + BASE).encode())
+    pg.Contents = pdf.make_stream(text_ops(['Page %d of six' % (i + 1)] + BASE).encode())
     pg.Rotate = [0, 90, 180, 270, 0, 90][i]
 pdf.save(path('geo-rotated-mix.pdf'))
 reg('geo-rotated-mix.pdf', 'pikepdf, six pages with different rotations', notes='each page rotated differently in one file')
