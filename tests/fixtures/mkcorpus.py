@@ -240,7 +240,7 @@ reg('st-split-streams.pdf', 'pikepdf, content split across streams', notes='/Con
 
 # marked content whose dictionary ends in a hex string ("<feff0041>>>"): Word and LibreOffice write this,
 # and a tokenizer that stops the dictionary at the first ">>" is left on a stray ">" (it once hung the editor)
-ops = ['/Span<</ActualText<feff0041>>>BDC', text_ops(BASE), 'EMC', '/P<</MCID 0/Alt(paren \\) in (nested) string)>>BDC EMC']
+ops = ['/Span<</ActualText<feff0041>>>BDC EMC', text_ops(BASE), '/P<</MCID 0/Alt(paren \\) in (nested) string)>>BDC EMC']
 make_pdf('\n'.join(ops)).save(path('st-actualtext-dict.pdf'))
 reg('st-actualtext-dict.pdf', 'pikepdf, marked content with ActualText hex ending the dictionary', notes='regression: ">>>" after a hex string inside a BDC dictionary froze Edit text')
 
