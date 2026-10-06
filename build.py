@@ -1,4 +1,4 @@
-import os, re, base64, hashlib, json
+import shutil, os, re, base64, hashlib, json
 css=open('style.css',encoding='utf-8').read()
 body=open('body.html',encoding='utf-8').read()
 app=open('app.js',encoding='utf-8').read()
@@ -158,13 +158,15 @@ def build(strict, brand=None):
         # fetch this one page in order to cache it. No other origin is allowed, ever.
         extra = ("manifest-src 'self'; worker-src 'self'; connect-src 'self'"
                  if brand.get('pwa') else "manifest-src 'none'; worker-src 'none'; connect-src 'none'")
-        csp=("default-src 'none'; script-src "+" ".join(hashes)+" 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src data: blob:; "
+        csp=("default-src 'none'; script-src "+" ".join(hashes)+" 'wasm-unsafe-eval'; style-src 'unsafe-inline'; img-src "+("'self' " if brand.get('pwa') else "")+"data: blob:; "
              "font-src data:; "+extra+"; media-src 'none'; object-src 'none'; frame-src 'none'; "
              "base-uri 'none'; form-action 'none'")
         head+='<meta http-equiv="Content-Security-Policy" content="'+csp+'">\n<meta name="referrer" content="no-referrer">\n'
     head+='<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<title>'+brand['title']+'</title>\n'
     if brand.get('pwa'):
-        head+='<link rel="manifest" href="manifest.webmanifest">\n<meta name="theme-color" content="#16181D">\n'
+        head+=('<link rel="manifest" href="manifest.webmanifest">\n<meta name="theme-color" content="#16181D">\n'
+               '<link rel="icon" href="icon.svg" type="image/svg+xml">\n<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">\n'
+               '<link rel="apple-touch-icon" href="apple-touch-icon.png">\n')
     sheet = css
     if brand.get('theme'):
         sheet = sheet.replace('</style>', brand['theme'] + '</style>') if '</style>' in sheet else sheet + '<style>' + brand['theme'] + '</style>'
@@ -183,19 +185,14 @@ os.makedirs(OUT,exist_ok=True)
 # A manifest, icons and a service worker. The file handler is what puts the app in Windows'
 # "Open with" list and the ChromeOS Files app, so a PDF can be opened straight into it, or
 # the app set as the default for .pdf.
+ICON_FILES = ['icon.svg', 'icon-maskable.svg', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'apple-touch-icon.png', 'favicon-32.png']
+
+
 def pwa_files(out_dir, brand, version):
-    icon_svg = ("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'>"
-                "<rect width='512' height='512' rx='96' fill='#16181D'/>"
-                "<rect x='136' y='96' width='208' height='272' rx='16' fill='#F7F8FA'/>"
-                "<path d='M296 96v56h56' fill='none' stroke='#16181D' stroke-width='16'/>"
-                "<rect x='168' y='200' width='144' height='16' rx='8' fill='#6E8BFA'/>"
-                "<rect x='168' y='240' width='144' height='16' rx='8' fill='#6E8BFA'/>"
-                "<rect x='168' y='280' width='96' height='16' rx='8' fill='#6E8BFA'/>"
-                "<rect x='136' y='392' width='240' height='24' rx='12' fill='#6E8BFA'/></svg>")
-    open(os.path.join(out_dir, 'icon.svg'), 'w', encoding='utf-8').write(icon_svg)
-    # the maskable variant keeps the artwork inside the safe area, so it is simply padded
-    open(os.path.join(out_dir, 'icon-maskable.svg'), 'w', encoding='utf-8').write(
-        icon_svg.replace("viewBox='0 0 512 512'", "viewBox='-64 -64 640 640'"))
+    # The icons are drawn in icons/ (SVG sources plus the PNGs rendered from them by
+    # tests/fixtures/mkicons.js), because installers, iPhones and browser tabs want PNGs.
+    for f in ICON_FILES:
+        shutil.copy(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icons', f), os.path.join(out_dir, f))
 
     manifest = {
         "name": brand['title'],
@@ -204,8 +201,10 @@ def pwa_files(out_dir, brand, version):
         "start_url": ".", "scope": ".", "display": "standalone",
         "background_color": "#16181D", "theme_color": "#16181D",
         "icons": [
+            {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+            {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
             {"src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"},
-            {"src": "icon-maskable.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable"},
+            {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ],
         # the part the operating system reads when offering an app for a .pdf
         "file_handlers": [{"action": ".", "accept": {"application/pdf": [".pdf"]},
@@ -222,7 +221,7 @@ def pwa_files(out_dir, brand, version):
           "const PAGE = './';\n\n"
           "self.addEventListener('install', e => {\n"
           "  e.waitUntil(caches.open(CACHE)\n"
-          "    .then(c => c.addAll([PAGE, './manifest.webmanifest', './icon.svg']))\n"
+          "    .then(c => c.addAll([PAGE, './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png', './favicon-32.png', './apple-touch-icon.png']))\n"
           "    .then(() => self.skipWaiting()));\n"
           "});\n"
           "self.addEventListener('activate', e => {\n"

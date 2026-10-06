@@ -129,6 +129,10 @@ A PDF opened that way lands straight in the editor. The app also registers a ser
 that caches the page, so it keeps working after the network goes away — verified by a test
 that loads it, removes the network, reloads, and then opens and renders a PDF.
 
+The app's icon (a document with a pen) is drawn in `icons/*.svg`; the PNGs installers, iPhones and
+browser tabs need are rendered from those by `node tests/fixtures/mkicons.js`, and `./build.sh` copies
+them next to the page. To use your own artwork, replace the SVGs, run that script, then rebuild.
+
 The service worker caches this one page and refuses anything from another origin. The page
 itself still makes no network requests of any kind.
 

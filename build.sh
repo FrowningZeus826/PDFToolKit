@@ -76,7 +76,7 @@ fi
 # sw.js matters most: its cache name changes with every build, and that change is what makes
 # a browser that already has the app fetch the new page instead of serving the cached one.
 if [[ "${SYNC_ROOT:-1}" == "1" && -f index.html && -f sw.js ]]; then
-  for f in index.html sw.js manifest.webmanifest icon.svg icon-maskable.svg; do cp "dist/$f" "$f"; done
+  for f in index.html sw.js manifest.webmanifest icon.svg icon-maskable.svg icon-192.png icon-512.png icon-maskable-512.png apple-touch-icon.png favicon-32.png; do cp "dist/$f" "$f"; done
   echo "==> synced the site files to the repo root"
 fi
 

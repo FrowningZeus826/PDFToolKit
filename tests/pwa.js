@@ -11,7 +11,7 @@ const DIR='/tmp/pwa-serve-'+PORT;
 
 (async()=>{
  fs.mkdirSync(DIR,{recursive:true});
- for (const f of ['index.html','manifest.webmanifest','sw.js','icon.svg','icon-maskable.svg'])
+ for (const f of ['index.html','manifest.webmanifest','sw.js','icon.svg','icon-maskable.svg','icon-192.png','icon-512.png','icon-maskable-512.png','apple-touch-icon.png','favicon-32.png'])
    fs.copyFileSync(path.join(OUT,f), path.join(DIR,f));
  const server=spawn('python3',['-m','http.server',String(PORT)],{cwd:DIR,stdio:'ignore',detached:true});
  await sleep(1500);
@@ -25,6 +25,17 @@ const DIR='/tmp/pwa-serve-'+PORT;
      !!m.file_handlers && JSON.stringify(m.file_handlers[0].accept)==='{"application/pdf":[".pdf"]}', JSON.stringify(m.file_handlers&&m.file_handlers[0]));
    check('manifest: offers a maskable icon as well as a plain one',
      m.icons.some(i=>i.purpose==='maskable') && m.icons.some(i=>i.purpose==='any'));
+   { // every icon the manifest names exists, and a PNG is the size it says
+     const png=f=>{ const b=fs.readFileSync(path.join(DIR,f)); return b.slice(0,8).toString('hex')==='89504e470d0a1a0a' ? {w:b.readUInt32BE(16),h:b.readUInt32BE(20)} : null; };
+     const bad=[]; for (const i of m.icons) { if (!fs.existsSync(path.join(DIR,i.src))) { bad.push(i.src+' missing'); continue; }
+       if (/png$/.test(i.src)) { const d=png(i.src); const want=+i.sizes.split('x')[0]; if (!d || d.w!==want || d.h!==want) bad.push(i.src+' is '+(d?d.w+'x'+d.h:'not a PNG')+', manifest says '+i.sizes); } }
+     check('manifest: every icon exists and is the size it claims', bad.length===0, bad.join('; '));
+     check('manifest: has PNG icons at 192 and 512 (what installers use) plus a maskable one',
+       [192,512].every(n=>m.icons.some(i=>i.type==='image/png' && i.sizes===n+'x'+n && i.purpose==='any')) && m.icons.some(i=>i.type==='image/png' && i.purpose==='maskable'));
+     const a=png('apple-touch-icon.png'); check('page: an iPhone home-screen icon (180x180 PNG) exists', a && a.w===180 && a.h===180);
+     const html=fs.readFileSync(path.join(DIR,'index.html'),'utf8');
+     check('page: links its tab icon and the iPhone icon', /rel="icon" href="icon.svg"/.test(html) && /rel="apple-touch-icon" href="apple-touch-icon.png"/.test(html));
+     check('page: the service worker precaches the icons', ['icon.svg','icon-192.png','icon-512.png','apple-touch-icon.png'].every(f=>fs.readFileSync(path.join(DIR,'sw.js'),'utf8').includes('./'+f))); }
    check('manifest: reuses an open window rather than stacking them', m.launch_handler && m.launch_handler.client_mode==='focus-existing');
 
    const p=await b.newPage();
