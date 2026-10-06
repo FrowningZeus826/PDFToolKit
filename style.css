@@ -532,4 +532,17 @@
     .styles { grid-template-columns: 1fr; }
     .pgrid { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; padding: 10px; }
   }
+  /* ---------- Pages, Prepare and Finish share the Document ribbon's look ---------- */
+  .panel-body.docbody > .docribbon + .sheet { margin-top: 0; }
+  .rdesc { font-size: 13px; color: var(--ink-soft); line-height: 1.45; }
+  #panel-pages .rbody .rpane, #panel-prepare .rbody .rpane, #panel-finish .rbody .rpane { min-height: 0; }
+  .sheet { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px 18px; }
+  #panel-prepare .sheet > *, #panel-finish .sheet > * { max-width: 760px; }
+  #panel-prepare .sheet > .status, #panel-finish .sheet > .status { max-width: 760px; }
+  .sub-tabs { border-bottom: 1px solid var(--line); margin-bottom: 14px; }
+  .sub-tabs .segbtn { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 7px 10px 6px; font-size: 13px; color: var(--ink-soft); }
+  .sub-tabs .segbtn + .segbtn { border-left: none; }
+  .sub-tabs .segbtn:hover:not(:disabled) { color: var(--ink); }
+  .sub-tabs .segbtn.active { background: none; color: var(--ink); font-weight: 600; border-bottom-color: var(--gold); }
+  #panel-pages .pagesbar { margin: 12px 0; padding: 6px 8px; background: var(--canvas); border: 1px solid var(--line); border-radius: 6px; }
 </style>

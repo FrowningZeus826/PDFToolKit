@@ -9,7 +9,7 @@ OCR, compress, protect and redact — all in the browser. No upload, no account,
 
 | Tab | |
 |---|---|
-| **Document** | View, annotate, fill forms, place a signature, edit the text already in the PDF |
+| **Document** | View, search, annotate, fill forms, place a signature, edit or redact the text already in the PDF |
 | **Pages** | Reorder, rotate, delete, combine files, extract pages |
 | **Prepare** | Strip hidden information, OCR a scan, compress |
 | **Finish** | Save, add or remove a password, sign with a digital ID, check signatures |
@@ -26,49 +26,59 @@ Where the document's own font can be reused, it is — including its bold or ita
 are handled through the encoding they declare, which covers most older documents. Text that
 can't be edited safely is marked and says why when you tap it.
 
-### One ribbon
+### One look throughout
 
-Everything on the Document tab lives in a single ribbon, like a word processor's: **Add to page**,
-**Fill form**, **Edit text**, **Redact** and **Whole document** are its tabs, and each tab shows
-only its own controls. Page navigation and zoom sit beside the tabs and Apply is at the right end of the ribbon. The page takes the
-full width; anything contextual (the signature builder, a selected object's properties, a form
-field) floats over its edge instead of taking a column. For reading, the arrow at the end of the
-tab row tucks the ribbon away (double-click the open tab does the same); picking a tab brings it
-back. On a phone it starts tucked away so the document comes first.
+Every tab uses the same layout: a ribbon card across the top whose tabs pick what you are doing,
+and the work underneath. **Document** puts its tools in the ribbon itself; **Pages**, **Prepare**
+and **Finish** use the same card for their tabs (Prepare: *Remove hidden info*, *Make searchable*,
+*Compress*; Finish: *Save*, *Password*, *Digital signature*) with their settings in a sheet below.
+Light and dark themes follow the system setting.
 
-**Find** (the magnifier beside the zoom controls, or Ctrl/Cmd+F) searches the whole document:
-matches are highlighted on the page, Enter and Shift+Enter step through them across pages, and
-the count says where you are. It reads the same text layer the page is drawn from, so a scan has
-nothing to search until OCR has run.
+### The Document ribbon
 
-Text added with **Add to page** is typed on the page itself: a new box takes the typing at once, and
-double-clicking a box (or pressing Enter on it) types in it again. While an item is selected its
-controls (font, size, alignment, colour, Done) take the place of the tool buttons in the ribbon, so
-the ribbon never changes height and there is no popout over the page. Delete an item with the X on
-its corner or the Delete key; Escape or Done finishes with it. An empty text box is dropped when you
-click away.
+**Add to page**, **Fill form**, **Edit text**, **Redact** and **Whole document** are its tabs, and each
+tab shows only its own controls. Page navigation and zoom sit beside the tabs and Apply is at the
+right end of the ribbon. The page takes the full width; anything contextual (the signature builder,
+a form field) floats over its edge instead of taking a column. For reading, the arrow at the end of
+the tab row tucks the ribbon away (double-clicking the open tab does the same); picking a tab brings
+it back. On a phone it starts tucked away so the document comes first.
 
 Save and Undo are icons in the header, next to the file's name and what has changed (Ctrl+S
 downloads what is open), so no row of the page is spent on them.
 
+**Find** (the magnifier beside the zoom controls, or Ctrl/Cmd+F) searches the whole document:
+matches are highlighted on the page, Enter and Shift+Enter step through them across pages, and
+the count says where you are. It reads the same text layer the page is drawn from, so a scan has
+nothing to search until OCR has run. The page box takes a typed page number.
+
+### Adding to the page
+
+Text added with **Add to page** is typed on the page itself, shown in the font it will be saved
+in: a new box takes the typing at once, and double-clicking a box (or pressing Enter on it) types
+in it again. While an item is selected its controls (font, size, alignment, colour, Done) replace the
+tool buttons in the ribbon, so the ribbon never changes height and there is no popout over the page.
+Colour is a palette plus a colour picker for any colour, and is saved exactly as chosen. Delete an
+item with the X on its corner or the Delete key; Escape or Done finishes with it. An empty text box
+is dropped when you click away.
+
+A new text box can be set in one of the document's own fonts: the font list names what the page
+already carries alongside the built-in faces, so added text matches the page and no extra font is
+embedded in the file.
+
 ### Finding your way around
 
-The page comes first. Editable blocks are not outlined until you point at one; a toggle in
-the panel outlines them all at once when you want to survey a document. Devices without a
-pointer start with everything shown, since there is no hover to rely on. The properties
-panel only exists when something is selected, and floats beside the page rather than taking
-a third of the width from it.
+The page comes first. Editable blocks are not outlined until you point at one; **Show all**
+outlines them all at once when you want to survey a document. Devices without a pointer start with
+everything shown, since there is no hover to rely on.
 
-### Typing on the page
+### Editing in place
 
-The controls sit in a ribbon above the page — grouping, show-all, merge, split, font and
-size — so they stay in one place and the page keeps the full width. There is no side panel
-for ordinary editing.
-
-Press a block once to select it, then press Enter (or press it a second time) to put a caret
-in the text and type where it sits. Text re-wraps inside its block as it grows, measured with
-the document's own glyph widths, and the ribbon says when a block has gained lines and will
-run down over what sits below. Escape leaves the text.
+The Edit text tab's controls — grouping, show-all, merge, split, font, size, text colour and
+alignment — sit in the ribbon, so the page keeps the full width. Press a block once to select it,
+then press Enter (or press it a second time) to put a caret in the text and type where it sits.
+The block is shown as it will be saved: laid out with the chosen font's real widths, in the
+chosen colour. Text re-wraps inside its block as it grows, and the ribbon says when a block has
+gained lines and will run down over what sits below. Escape leaves the text.
 
 ### How willingly text is grouped
 
@@ -86,12 +96,6 @@ needs to know which instructions draw it — so text the tool refuses to rewrite
 deleted. Select it and the panel says why it cannot be rewritten, and what else will go: one
 drawing instruction sometimes covers more than the line you pointed at, and anything sharing
 it is outlined on the page before you commit.
-
-### Adding new text
-
-A new text box can be set in one of the document's own fonts — the picker lists what the
-page already carries alongside the built-in faces — so added text matches the page instead
-of approximating it, and no extra font is embedded in the file.
 
 ### Redaction
 
@@ -198,6 +202,13 @@ pdf.js, the pdf-lib fork and the OCR engine are held to their current major vers
 purpose: those change APIs across majors, and the OCR engine must stay in step with its
 language data. Moving them is a deliberate decision, not an automatic one.
 
+## Security
+
+The page runs under a strict Content-Security-Policy with no network access and no `eval`, and
+treats every PDF as hostile input. `SECURITY.md` has the latest assessment: what was found and
+fixed, what was reviewed, and what is still open (notably that node-forge has no patched
+release yet, so signature checking is done by the tool's own strict RSA check).
+
 ## Third-party components
 
 | Component | Licence |
@@ -218,6 +229,7 @@ Each is named in a comment beside its inlined code in the built file.
   does not push later paragraphs down.
 - Replacement text falls back to a built-in font when the document's own font lacks a
   character you typed, and says which character caused it.
+- Edited (existing) text blocks keep their original colour unless you change it in the ribbon.
 - Verified in Chromium. Safari, iOS and ChromeOS are untested.
 
 ## Licence

@@ -305,9 +305,12 @@
 
     <!-- MERGE -->
     <section class="panel" id="panel-pages">
-      <div class="panel-body wide2">
-        <h2>Pages</h2>
-        <p class="sub">Reorder, rotate, delete, combine and extract pages. Drag to reorder; tap a page to select it.</p>
+      <div class="panel-body docbody">
+        <div class="docribbon">
+          <div class="rtabs"><div class="rtablist" role="tablist" aria-label="Pages"><button class="segbtn active" role="tab" aria-selected="true">Organize pages</button></div></div>
+          <div class="rbody"><div class="rpane"><span class="rdesc">Reorder, rotate, delete, combine and extract pages. Drag to reorder; tap a page to select it.</span></div></div>
+        </div>
+        <div class="sheet">
         <label class="dropzone compact" id="pages-dz" tabindex="0" role="button" aria-label="Choose a PDF">
           <span class="dz-title">Document</span>
           <span class="dz-sub" id="pages-name">Choose a file or drag it here</span>
@@ -332,18 +335,21 @@
           <button class="primary" id="pages-go" disabled>No changes yet</button>
         </div>
         <div class="status" id="pages-status" role="status"></div>
+        </div>
       </div>
     </section>
 
     <section class="panel" id="panel-prepare">
-      <div class="panel-body">
-        <h2>Prepare</h2>
-        <p class="sub">Clean up, read, and shrink the document that's open. Each step applies to it here; download when you're finished.</p>
-        <div class="seg" id="prep-modes" role="tablist" aria-label="Prepare">
+      <div class="panel-body docbody">
+        <div class="docribbon">
+          <div class="rtabs"><div class="rtablist" id="prep-modes" role="tablist" aria-label="Prepare">
           <button class="segbtn active" role="tab" aria-selected="true" data-mode="meta">Remove hidden info</button>
           <button class="segbtn" role="tab" aria-selected="false" data-mode="ocr">Make searchable</button>
           <button class="segbtn" role="tab" aria-selected="false" data-mode="compress">Compress</button>
+          </div></div>
+          <div class="rbody"><div class="rpane"><span class="rdesc">Clean up, read, and shrink the document that's open. Each step applies to it here; download when you're finished.</span></div></div>
         </div>
+        <div class="sheet">
         <div id="prep-empty" class="hint">Open a document first — the Document tab.</div>
         <div id="prep-work" hidden>
           <div id="prot-meta">
@@ -381,18 +387,21 @@
         </div>
         <div class="status" id="prep-status" role="status"></div>
         <div class="status" id="opt-status" role="status"></div>
+        </div>
       </div>
     </section>
 
     <section class="panel" id="panel-finish">
-      <div class="panel-body">
-        <h2>Finish</h2>
-        <p class="sub">Save the document, lock it with a password, or sign it. Signing and passwords come last: any later change would break them.</p>
-        <div class="seg" id="fin-modes" role="tablist" aria-label="Finish">
+      <div class="panel-body docbody">
+        <div class="docribbon">
+          <div class="rtabs"><div class="rtablist" id="fin-modes" role="tablist" aria-label="Finish">
           <button class="segbtn active" role="tab" aria-selected="true" data-mode="save">Save</button>
           <button class="segbtn" role="tab" aria-selected="false" data-mode="password">Password</button>
           <button class="segbtn" role="tab" aria-selected="false" data-mode="sign">Digital signature</button>
+          </div></div>
+          <div class="rbody"><div class="rpane"><span class="rdesc">Save the document, lock it with a password, or sign it. Signing and passwords come last: any later change would break them.</span></div></div>
         </div>
+        <div class="sheet">
         <div id="fin-save">
           <div class="finishrow">
             <div>
@@ -404,7 +413,7 @@
           <div class="hint">Nothing is written to disk until you download. Everything you have applied is included.</div>
         </div>
         <div id="fin-password" hidden>
-          <div class="seg sub-seg" id="pw-modes" role="tablist" aria-label="Password">
+          <div class="rtablist sub-tabs" id="pw-modes" role="tablist" aria-label="Password">
             <button class="segbtn active" role="tab" aria-selected="true" data-mode="lock">Add a password</button>
             <button class="segbtn" role="tab" aria-selected="false" data-mode="unlock">Remove a password</button>
           </div>
@@ -445,7 +454,7 @@
         </div>
         </div>
         <div id="fin-sign" hidden>
-          <div class="seg sub-seg" id="dg-modes" role="tablist" aria-label="Digital signature">
+          <div class="rtablist sub-tabs" id="dg-modes" role="tablist" aria-label="Digital signature">
             <button class="segbtn active" role="tab" aria-selected="true" data-mode="sign">Sign this document</button>
             <button class="segbtn" role="tab" aria-selected="false" data-mode="verify">Check signatures</button>
             <button class="segbtn" role="tab" aria-selected="false" data-mode="create">Create an ID</button>
@@ -515,6 +524,7 @@
         </div>
         <div class="status" id="fin-status" role="status"></div>
         <div class="status" id="dg-status" role="status"></div>
+        </div>
       </div>
     </section>
 
